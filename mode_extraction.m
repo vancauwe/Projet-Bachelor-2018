@@ -1,6 +1,7 @@
 function [dates,modes,colors] = mode_extraction(txt)
 
-index=890;
+%modes: for testing for logs3 index can be 890
+index=1;
 %timestamps, colors and modenames that correspond to a mode SELECTION
 %color_vect={}; txt_date_vect={}; mode_vect={}; 
 index_vect=[];

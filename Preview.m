@@ -514,8 +514,9 @@ if(isequal(handles.loaded,1))
         %get corresponding time doubles 
         %get indexes of timestamps corresponding to those where entering a mode
         [values,~]=wkv_get(handles.wkv, 'timestamp');
-
-        indexTime=1170000 ; k=1; saved=[];
+        
+        %modes: for testing indexTime for log3 can be 1170000
+        indexTime=1 ; k=1; saved=[];
         while(indexTime<=length(values))
             %note that the values are datetimes and not strings from the log so
             %necessary to convert them to compare to the string date extracted
