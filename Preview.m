@@ -22,7 +22,7 @@ function varargout = Preview(varargin)
 
 % Edit the above text to modify the response to help Preview
 
-% Last Modified by GUIDE v2.5 04-Apr-2018 23:44:18
+% Last Modified by GUIDE v2.5 18-Apr-2018 10:13:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -59,6 +59,7 @@ if ~isempty(handles.h)
 browserdata = guidata(handles.h);
 handles.fileToAnalyse = browserdata.analysis_file;
 handles.currentFileList=browserdata.filelist;
+handles.loaded=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -103,6 +104,11 @@ try
       %first load the file corresponding to the name handles.fileToAnalyse
       handles.input=load(handles.fileToAnalyse{1});
       
+      %variable that allows to know if file has been loaded: so as to not
+      %be able to ask for the scroll to change if variable has not been
+      %loaded::
+      handles.loaded=1; 
+      
       [handles.dim1, ~]= size(handles.input.logs);
       if(handles.dim1~=1)
       
@@ -132,7 +138,7 @@ end
 %%
 %ADAPTING TO FILE => make subwkv have txt later on. DONE
 %if(handles.dim1~=1)
-wkv=handles.input.logs(handles.LogIndex).wkv;
+handles.wkv=handles.input.logs(handles.LogIndex).wkv;
 %else
     %wkv=handles.input.logs;
 %end
@@ -176,7 +182,7 @@ end
 % INTERACTIVE TIMELINE
 
 % Find the timestamp index.
-timeIndex = find(strcmp({wkv.name}, 'timestamp'), 1);
+timeIndex = find(strcmp({handles.wkv.name}, 'timestamp'), 1);
 
 if isempty(timeIndex)
     error('The timestamp could not be found.');
@@ -184,13 +190,13 @@ end
 
 % Discard all the data before a change of time (dt > 1 min), otherwise a
 % lot of manual zooming will be required to see the relevant data.
-setTimeInd = find(abs(diff(wkv(timeIndex).values)) > duration(0, 1, 0), ...
+setTimeInd = find(abs(diff(handles.wkv(timeIndex).values)) > duration(0, 1, 0), ...
                   1, 'last');
 
 if isempty(setTimeInd)
-    startIndex = 1;
+    handles.startIndex = 1;
 else
-    startIndex = setTimeInd+1;
+    handles.startIndex = setTimeInd+1;
 end
 
 %make the diverse things that can be represented
@@ -202,15 +208,19 @@ if(~exist('wkv_get.m', 'file'))
      errordlg(['Please place the file wkv_get.m in the same folder as this GUI.'],'Missing External .m file!');
     return;
 else
-    [~, varIndex]=wkv_get(wkv, handles.val);
+    if(handles.val~= '-')
+    [~, varIndex]=wkv_get(handles.wkv, handles.val);
+    end
 end
 %%
-handles.timeline =plot(wkv(end).values(startIndex:end), wkv(varIndex).values(startIndex:end));
-% Plot and get the two clicks locations.
-axes(handles.Log_timeline);
-xlabel('Time [us]');
-%%% 5 should be determined to be a choice representaition
-ylabel(string(wkv(varIndex).name));
+if(handles.val~= '-')
+    handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(varIndex).values(handles.startIndex:end));
+    % Plot and get the two clicks locations.
+    axes(handles.Log_timeline);
+    xlabel('Time [us]');
+    %%% 5 should be determined to be a choice representaition
+    ylabel(string(handles.wkv(varIndex).name));
+end
 
 guidata(hObject, handles);
 
@@ -227,121 +237,147 @@ function select_button_Callback(hObject, eventdata, handles)
 % hObject    handle to select_button (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+if(isequal(handles.loaded,1))
+    %%
+    %if(handles.dim1~=1)
+    wkv=handles.input.logs(handles.LogIndex).wkv;
+    %else
+        %wkv=handles.input.logs;
+    %end
 
-%%
+    %%
 
-%if(handles.dim1~=1)
-wkv=handles.input.logs(handles.LogIndex).wkv;
-%else
-    %wkv=handles.input.logs;
-%end
+    [t_crop, ~] = ginput(2);
 
-%%
+    % Get the corresponding begin/end indices.
+    beginIndex = 1;
+    endIndex = length(wkv(end).values);
 
-[t_crop, ~] = ginput(2);
-
-% Get the corresponding begin/end indices.
-beginIndex = 1;
-endIndex = length(wkv(end).values);
-
-if t_crop(1) > t_crop(2)
-    tmp = t_crop(1);
-    t_crop(1) = t_crop(2);
-    t_crop(2) = tmp;
-end
-
-for i=1:length(wkv(end).values)
-    if wkv(end).values(i) >= t_crop(1)
-        beginIndex = i;
-        break;
+    if t_crop(1) > t_crop(2)
+        tmp = t_crop(1);
+        t_crop(1) = t_crop(2);
+        t_crop(2) = tmp;
     end
-end
 
-for i=beginIndex:length(wkv(end).values)
-    if wkv(end).values(i) >= t_crop(2)
-        endIndex = i;
-        break;
+    for i=1:length(wkv(end).values)
+        if wkv(end).values(i) >= t_crop(1)
+            beginIndex = i;
+            break;
+        end
     end
-end
 
-range = beginIndex:endIndex;
+    for i=beginIndex:length(wkv(end).values)
+        if wkv(end).values(i) >= t_crop(2)
+            endIndex = i;
+            break;
+        end
+    end
 
-%Extract the dataset.
+    range = beginIndex:endIndex;
 
-for i=1:length(wkv)
-    wkv(i).values = wkv(i).values(range);
-end
+    %Extract the dataset.
 
-%%
-handles.subwkv = struct('wkv', wkv, 'txt', 'temporary');
+    for i=1:length(wkv)
+        wkv(i).values = wkv(i).values(range);
+    end
 
-%handles.subtext
-%get from subwkv the first and last timestamp
-first_time=handles.subwkv.wkv(1).values(1);
-last_time=handles.subwkv.wkv(1).values(end);
-%cut up timestamps to use info
-txt_first=timestampConversion(first_time);
-txt_last=timestampConversion(last_time);
+    %%
+    handles.subwkv = struct('wkv', wkv, 'txt', 'temporary');
 
-%Create handles.textfile (array of lines) to make the txt file associated to the subwkv
-index=1;
+    %handles.subtext
+    %get from subwkv the first and last timestamp
+    first_time=handles.subwkv.wkv(1).values(1);
+    last_time=handles.subwkv.wkv(1).values(end);
+    %cut up timestamps to use info
+    txt_first=timestampConversion(first_time);
+    txt_last=timestampConversion(last_time);
 
-while(length(handles.textfile)>=index)
-    %reach the first timestamp of subwkv
-    entry=handles.textfile{index};
-    entry_decompo=strsplit(entry,' ');
-    txt_date=entry_decompo{1,1};
+    %Create handles.textfile (array of lines) to make the txt file associated to the subwkv
+    index=1;
 
-    if(~strcmp(txt_date,txt_first))
-        handles.subtxt={};
-        %when first timestamp reached. Save all entries until last one reached
-        while(~strcmp(txt_date,txt_last))
+    while(length(handles.textfile)>=index)
+        %reach the first timestamp of subwkv
         entry=handles.textfile{index};
         entry_decompo=strsplit(entry,' ');
         txt_date=entry_decompo{1,1};
 
-        handles.subtxt{end+1,1}=entry;
+        if(~strcmp(txt_date,txt_first))
+            handles.subtxt={};
+            %when first timestamp reached. Save all entries until last one reached
+            while(~strcmp(txt_date,txt_last))
+                entry=handles.textfile{index};
+                entry_decompo=strsplit(entry,' ');
+                txt_date=entry_decompo{1,1};
+
+                handles.subtxt{end+1,1}=entry;
+                index=index+1;
+
+            end
+
+            if(txt_date==txt_last)
+                break;
+
+            end
+
+
+        end
         index=index+1;
-        
-        end
-        
-        if(txt_date==txt_last)
-            break;
-        
-        end
-        
-  
+
     end
-    index=index+1;
-    
-end
 
-%in save ask the user to name the log file by giving a number and put this
-%new name in the subwkv file 2nd field
+    %in save ask the user to name the log file by giving a number and put this
+    %new name in the subwkv file 2nd field
 
-safe=0;
-while(safe==0)
-    prompt={'Enter a number for the log info text file that will be created in association to this data.'};
-    dlg_title= 'Text File Number Choice';
-    num_lines=1;
-    answer=inputdlg(prompt,dlg_title,num_lines);
+    safe=0;
+    while(safe==0)
+        prompt={'Enter a number for the log info text file that will be created in association to this data.'};
+        dlg_title= 'Text File Number Choice';
+        num_lines=1;
+        answer=inputdlg(prompt,dlg_title,num_lines);
 
-    Name=strcat('log_',answer{1},'_info.txt')
-    if(~ (exist(Name, 'file') == 2))
-        handles.subtxtName=Name; 
-        safe=1;
-    else
-        errordlg(['Please choose a different log ID number.'],'Danger of file overwrite.');
+        Name=strcat('log_',answer{1},'_info.txt')
+        if(~ (exist(Name, 'file') == 2))
+            handles.subtxtName=Name; 
+            safe=1;
+        else
+            errordlg(['Please choose a different log ID number.'],'Danger of file overwrite.');
+            return;
+        end
+    end
+
+    %handles because necessary for subsequent saving and creation of the actual txt file
+
+    %Creating the handle corresponding to cut up
+    handles.subwkv = struct('wkv', wkv, 'txt', handles.subtxtName);
+
+    %WKV HANDLE REALLOCATED TO THE CUT UP VERSION, same for the textfile index 
+    handles.wkv=handles.subwkv.wkv;
+    handles.textfile=handles.subtxt; 
+    %disp(handles.subwkv.wkv.name)
+    %i.e. the selection is irreversible.
+
+    %%
+    %call function to get values and index => wkv_get must be in the same
+    %folder as the GUI Preview
+    if(~exist('wkv_get.m', 'file'))
+         errordlg(['Please place the file wkv_get.m in the same folder as this GUI.'],'Missing External .m file!');
         return;
+    else
+        if(handles.val~= '-')
+        [~, handles.varIndex]=wkv_get(handles.wkv, handles.val);
+        end
+    end
+
+    if(handles.val~= '-')
+        handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        % Plot and get the two clicks locations.
+        axes(handles.Log_timeline);
+        xlabel('Time [us]');
+        %%% 5 should be determined to be a choice representaition
+        ylabel(string(handles.wkv(handles.varIndex).name));
     end
 end
-    
-%handles because necessary for subsequent saving and creation of the actual txt file
 
-%TO DO: Must create a "Security" loop to make sure this file name is not already present in the directory
-
-%Creating the handle corresponding to cut up
-handles.subwkv = struct('wkv', wkv, 'txt', handles.subtxtName);
 
 guidata(hObject, handles);
 
@@ -352,42 +388,44 @@ function save_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %%
-[filename, path]=uiputfile;
-newfilename = fullfile(path, filename);
-logs=handles.subwkv;
-try 
-    save(newfilename, 'logs');
-     
-    currentList=get(handles.currentFileList, 'String');
-    
-    newFileList = [currentList; cellstr(newfilename) ];
-    %set(handles.currentfilelist, 'String', handles.Files);
-    %newFileList = handles.currentFileList;
-    
-    
-    set(handles.currentFileList, 'String', newFileList);
-    setappdata(handles.h,'filelist', handles.currentFileList);
-catch
-    errordlg(['There was a problem saving the mat file.'],'Save Error!');
-    return;
-end
+if(isequal(handles.loaded,1))
+    [filename, path]=uiputfile;
+    newfilename = fullfile(path, filename);
+    logs=handles.subwkv;
+    try 
+        save(newfilename, 'logs');
 
-try
-    txtToSave=fullfile(path,handles.subtxtName);
-   
-    fileID=fopen(txtToSave,'w');
-    S=handles.subtxt;
-    i=1;
-    while(i<= length(handles.subtxt))
-       
-        fprintf(fileID,'%s\n', S{i,1});
-        i=i+1;
+        currentList=get(handles.currentFileList, 'String');
+
+        newFileList = [currentList; cellstr(newfilename) ];
+        %set(handles.currentfilelist, 'String', handles.Files);
+        %newFileList = handles.currentFileList;
+
+
+        set(handles.currentFileList, 'String', newFileList);
+        setappdata(handles.h,'filelist', handles.currentFileList);
+    catch
+        errordlg(['There was a problem saving the mat file.'],'Save Error!');
+        return;
     end
-    fclose(fileID);
-    
-catch
-    errordlg(['There was a problem saving the txt file.'],'Save Error!');
-    return;
+
+    try
+        txtToSave=fullfile(path,handles.subtxtName);
+
+        fileID=fopen(txtToSave,'w');
+        S=handles.subtxt;
+        i=1;
+        while(i<= length(handles.subtxt))
+
+            fprintf(fileID,'%s\n', S{i,1});
+            i=i+1;
+        end
+        fclose(fileID);
+
+    catch
+        errordlg(['There was a problem saving the txt file.'],'Save Error!');
+        return;
+    end
 end
 guidata(hObject, handles);
 %%
@@ -412,6 +450,28 @@ function variableChoice_Callback(hObject, eventdata, handles)
 %%
 contents = cellstr(get(handles.variableChoice,'String'));
 handles.val=contents{get(handles.variableChoice,'Value')};
+%%
+%call function to get values and index => wkv_get must be in the same
+%folder as the GUI Preview
+if(~exist('wkv_get.m', 'file'))
+    errordlg(['Please place the file wkv_get.m in the same folder as this GUI.'],'Missing External .m file!');
+    return;
+else
+    %wkv needs to be a handle
+    %startIndex also
+    if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
+        [~, handles.varIndex]=wkv_get(handles.wkv, handles.val);
+    end
+end
+%%
+if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
+    handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
+    % Plot and get the two clicks locations.
+    axes(handles.Log_timeline);
+    xlabel('Time [us]');
+    %%% 5 should be determined to be a choice representaition
+    ylabel(string(handles.wkv(handles.varIndex).name));
+end
 
 guidata(hObject, handles);
 
@@ -430,4 +490,88 @@ function variableChoice_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+handles.val='-';
 guidata(hObject, handles);
+
+
+% --- Executes on button press in mode_button.
+function mode_button_Callback(hObject, eventdata, handles)
+% hObject    handle to mode_button (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if(isequal(handles.loaded,1))
+    %get from txt file all the modes entered in this data
+    [dates, modes, colors]=mode_extraction(handles.textfile);
+    if(~isempty(dates))
+        %convert to a wkv timestamp format
+        i=1; 
+        while(i<=length(dates))
+            convertedDates{1,i}=matTimeConversion(dates{1,i});
+            i=i+1;
+        end
+
+        %get corresponding time doubles 
+        %get indexes of timestamps corresponding to those where entering a mode
+        [values,~]=wkv_get(handles.wkv, 'timestamp');
+
+        indexTime=1170000 ; k=1; saved=[];
+        while(indexTime<=length(values))
+            %note that the values are datetimes and not strings from the log so
+            %necessary to convert them to compare to the string date extracted
+            %from text
+
+            if(k<=length(convertedDates))
+                if(strcmp(datestr( values(indexTime) ), convertedDates{1,k}))
+                    saved=[saved,indexTime];
+                    k=k+1;
+                end
+            else
+                break;
+            end
+            indexTime=indexTime+1;  
+        end
+
+        [timeDoubles,~]=wkv_get(handles.wkv, 'timestamp_num');
+
+        ind=1; toPlotTimes=[];
+        while(ind<=length(saved))
+            toPlotTimes=[toPlotTimes,timeDoubles(saved(ind))];
+            ind=ind+1;
+        end
+
+
+        handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
+        hold on
+        ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        y=[ymin,ymax]; %height of the curves
+        ind=1;
+        while(ind<=length(toPlotTimes))
+            xval=toPlotTimes(ind);
+            x=[xval,xval];
+            handles.timeline= plot(x,y, colors{1,ind});
+            ind=ind+1;
+        end
+        hold off
+    end
+end
+
+
+
+
+guidata(hObject, handles);
+
+
+% --- Executes on button press in step_button.
+function step_button_Callback(hObject, eventdata, handles)
+% hObject    handle to step_button (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in cadence_button.
+function cadence_button_Callback(hObject, eventdata, handles)
+% hObject    handle to cadence_button (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
