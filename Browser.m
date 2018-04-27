@@ -216,7 +216,7 @@ try
     i=1;
     while( i<=length(albumIndexes))
        Filenames = get(handles.filelist,'String');
-       fileToLoad=Filenames{i};
+       fileToLoad=Filenames{albumIndexes(i)};
        
        [~,name,~]=fileparts(fileToLoad);
        newPlace=fullfile(newFolder,name);

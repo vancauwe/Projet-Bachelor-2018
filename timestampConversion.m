@@ -1,4 +1,4 @@
-function [txt_equiv] = timestampConversion(mat_time)
+function [txt_equiv, day, hour, min, secs] = timestampConversion(mat_time)
 mat_time=datestr(mat_time); %incoming data is a datetime object not string so conversion is necessary
 str_elements = strsplit(mat_time,' '); %seperate date from time
 

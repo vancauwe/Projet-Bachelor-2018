@@ -22,7 +22,7 @@ function varargout = Preview(varargin)
 
 % Edit the above text to modify the response to help Preview
 
-% Last Modified by GUIDE v2.5 18-Apr-2018 10:13:42
+% Last Modified by GUIDE v2.5 26-Apr-2018 19:28:19
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -60,6 +60,8 @@ browserdata = guidata(handles.h);
 handles.fileToAnalyse = browserdata.analysis_file;
 handles.currentFileList=browserdata.filelist;
 handles.loaded=0;
+handles.extraction=0;
+handles.cropped=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -134,7 +136,10 @@ catch
     errordlg(['There was a problem loading the file.'],'Load Error!');
    return;
 end
-
+%%
+%Linking x axis of timeline and analysisAxis
+ax=[handles.Log_timeline, handles.analysisAxis];
+linkaxes(ax,'x');
 %%
 %ADAPTING TO FILE => make subwkv have txt later on. DONE
 %if(handles.dim1~=1)
@@ -199,8 +204,6 @@ else
     handles.startIndex = setTimeInd+1;
 end
 
-%make the diverse things that can be represented
-%get index corresponding to name via get function
 
 %call function to get values and index => wkv_get must be in the same
 %folder as the GUI Preview
@@ -240,6 +243,7 @@ function select_button_Callback(hObject, eventdata, handles)
 if(isequal(handles.loaded,1))
     %%
     %if(handles.dim1~=1)
+    handles.cropped=1;
     wkv=handles.input.logs(handles.LogIndex).wkv;
     %else
         %wkv=handles.input.logs;
@@ -289,9 +293,11 @@ if(isequal(handles.loaded,1))
     first_time=handles.subwkv.wkv(1).values(1);
     last_time=handles.subwkv.wkv(1).values(end);
     %cut up timestamps to use info
-    txt_first=timestampConversion(first_time);
-    txt_last=timestampConversion(last_time);
-
+    [txt_first, first_day, first_hour, first_min, first_secs]=timestampConversion(first_time);
+   
+    [txt_last, last_day, last_hour, last_min, last_secs]=timestampConversion(last_time);
+    
+    
     %Create handles.textfile (array of lines) to make the txt file associated to the subwkv
     index=1;
 
@@ -300,23 +306,45 @@ if(isequal(handles.loaded,1))
         entry=handles.textfile{index};
         entry_decompo=strsplit(entry,' ');
         txt_date=entry_decompo{1,1};
-
-        if(~strcmp(txt_date,txt_first))
+        
+        %further decomposition for a more in depth comparison of txt_date
+        %and txt_first and txt_last
+        str_elements = strsplit(txt_date,'_'); %seperate date from time
+        h=str_elements{1,2}; min=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
+        getDay=strsplit(str_elements{1,1},'-');
+        d=getDay{1,3};
+        
+        %not all dates are in the txt file so necessary to look if the
+        %current line of the text file is after the desired first date
+        %extracted from the subwkv or after the desired last date.
+        
+        [passed_first] = date_skipped_check(secs, min, h, d,first_secs,first_min, first_hour, first_day);
+        
+        if(strcmp(txt_date,txt_first) || isequal(passed_first,1))
             handles.subtxt={};
+            passed_last=0;
             %when first timestamp reached. Save all entries until last one reached
-            while(~strcmp(txt_date,txt_last))
+            while(~strcmp(txt_date,txt_last) && isequal(passed_last,0))
+                
                 entry=handles.textfile{index};
                 entry_decompo=strsplit(entry,' ');
                 txt_date=entry_decompo{1,1};
-
+                
+                %further decomposition for a more in depth comparison of txt_date
+                %and txt_first and txt_last
+                str_elements = strsplit(txt_date,'_'); %seperate date from time
+                h=str_elements{1,2}; min=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
+                getDay=strsplit(str_elements{1,1},'-');
+                d=getDay{1,3};
+                [passed_last] = date_skipped_check(secs, min, h, d,last_secs,last_min, last_hour, last_day);
+        
                 handles.subtxt{end+1,1}=entry;
                 index=index+1;
 
             end
 
-            if(txt_date==txt_last)
-                break;
-
+            if(strcmp(txt_date,txt_last) || isequal(passed_last,1))
+                 break;
             end
 
 
@@ -501,78 +529,230 @@ function mode_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if(isequal(handles.loaded,1))
-    %get from txt file all the modes entered in this data
-    [dates, modes, colors]=mode_extraction(handles.textfile);
-    if(~isempty(dates))
-        %convert to a wkv timestamp format
-        i=1; 
-        while(i<=length(dates))
-            convertedDates{1,i}=matTimeConversion(dates{1,i});
-            i=i+1;
+    if(~isequal(handles.cropped,1))
+        %get from txt file all the modes entered in this data
+        if(isequal(handles.extraction,0))
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            handles.extraction=1;
+            
+            disp('step1');
         end
 
-        %get corresponding time doubles 
-        %get indexes of timestamps corresponding to those where entering a mode
-        [values,~]=wkv_get(handles.wkv, 'timestamp');
-        
-        %modes: for testing indexTime for log3 can be 1170000
-        indexTime=1 ; k=1; saved=[];
-        while(indexTime<=length(values))
-            %note that the values are datetimes and not strings from the log so
-            %necessary to convert them to compare to the string date extracted
-            %from text
+        if(~isempty(handles.dates) && ~(isequal(handles.endMode, ' ')))
 
-            if(k<=length(convertedDates))
-                if(strcmp(datestr( values(indexTime) ), convertedDates{1,k}))
-                    saved=[saved,indexTime];
-                    k=k+1;
-                end
-            else
-                break;
+            k=1;
+            while(k<=length(handles.endMode))
+                convertedEnds{1,k}=matTimeConversion(handles.endMode{1,k});
+                k=k+1;
+                disp('step2');
             end
-            indexTime=indexTime+1;  
+            
+            disp('step3');
+            ends_num=getTimeDoubles(handles.wkv,convertedEnds);
+            
+
+            %convert to a wkv timestamp format
+            i=1; 
+            while(i<=length(handles.dates))
+                disp('step4');
+                convertedDates{1,i}=matTimeConversion(handles.dates{1,i});
+                i=i+1;
+            end
+
+           %where code was
+           %replacement:
+           disp('step5');
+           toPlotTimes=getTimeDoubles(handles.wkv,convertedDates);
+           
+           disp(toPlotTimes);
+           
+           disp('step6');
+            axes(handles.Log_timeline);
+            handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
+            hold on
+            ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+            ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+            y=[ymin,ymax]; %height of the curves
+            ind=1;
+            
+            
+            while(ind<=length(toPlotTimes) && ind<=length(ends_num))
+                xval=toPlotTimes(ind);
+
+                axes(handles.Log_timeline);
+                x=[xval,xval];
+                handles.timeline= plot(x,y, handles.colors{1,ind});
+
+                %second axis
+                x_analysis=[xval, ends_num(ind)];
+                axes(handles.analysisAxis);
+                xlim manual;
+                ylim([0,1]);
+                hold on
+                plot(x_analysis, [0.5,0.5],handles.colors{1,ind}, 'Linewidth',5);
+                hold off
+
+
+                mtext{1,ind}=sprintf('%s : %s ', handles.modes{1,ind},handles.colors{1,ind});
+                ind=ind+1;
+            end
+            mtext;
+            set(handles.modestext, 'String', mtext);
+            axes(handles.Log_timeline);
+            hold off
+
+        else
+            f = msgbox('Your selection does not comprise enough input to identify the modes: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Mode Functionality Unoperational.'); 
+
         end
-
-        [timeDoubles,~]=wkv_get(handles.wkv, 'timestamp_num');
-
-        ind=1; toPlotTimes=[];
-        while(ind<=length(saved))
-            toPlotTimes=[toPlotTimes,timeDoubles(saved(ind))];
-            ind=ind+1;
-        end
-
-
-        handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
-        hold on
-        ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-        ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-        y=[ymin,ymax]; %height of the curves
-        ind=1;
-        while(ind<=length(toPlotTimes))
-            xval=toPlotTimes(ind);
-            x=[xval,xval];
-            handles.timeline= plot(x,y, colors{1,ind});
-            ind=ind+1;
-        end
-        hold off
+    
+    else
+        f=msgbox('You have cropped your data set. Please "Save to Browser" and reopen cropped data in Preview for analysis. consider looking at a broader selection.','Necessary to "Save to Browser" and "Preview" to proceed with analysis.'); 
+        
     end
 end
-
-
-
 
 guidata(hObject, handles);
 
 
-% --- Executes on button press in step_button.
-function step_button_Callback(hObject, eventdata, handles)
-% hObject    handle to step_button (see GCBO)
+
+% --- Executes on button press in button.
+function button_Callback(hObject, eventdata, handles)
+% hObject    handle to button (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if(isequal(handles.loaded,1))
+    
+    if(~isequal(handles.cropped,1))
+        if(isequal(handles.extraction,0))
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime,handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            handles.extraction=1;
+        end
+
+        if(~isempty(handles.LeftS) && ~isempty(handles.LeftS))
+            k=1;
+            while(k<=length(handles.LeftS))
+                convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
+                k=k+1;
+            end
+
+            k=1;
+            while(k<=length(handles.RightS))
+                convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
+                k=k+1;
+            end
+
+            RightS_num=getTimeDoubles(handles.wkv,convertedRightS);
+            LeftS_num=getTimeDoubles(handles.wkv,convertedLeftS);
+
+            k=1; j=1;
+            hold on
+            while(k<=length(RightS_num))
+                while(j<=length(LeftS_num))
+                    axes(handles.analysisAxis);
+                    xlim manual;
+                    ylim([0,1]);
+                    hold on
+                    plot([RightS_num(k),RightS_num(k)],[0.5,0.5], 'ko');
+                    plot([LeftS_num(j),LeftS_num(j)],[0.5,0.5], 'k*');
+                    k=k+1;j=j+1;
+                    hold off;
+                end
+            end
+
+            stext{1,1}=sprintf('Left steps : %d ', handles.left);
+            stext{1,2}=sprintf('Right steps : %d ', handles.right);
+            set(handles.stepstext, 'String', stext);
+
+            %put plot focus back on the default log timeline and not on the analysis
+            %timeline: avoid having the data plotted in the wrong axes
+            axes(handles.Log_timeline);
+            hold off
+        else
+            f = msgbox('Your selection does not comprise any steps: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Steps Functionality Unoperational.'); 
+        end
+    
+    else
+        f=msgbox('You have cropped your data set. Please "Save to Browser" and reopen cropped data in Preview for analysis. consider looking at a broader selection.','Necessary to "Save to Browser" and "Preview" to proceed with analysis.'); 
+        
+    end
+end
+guidata(hObject, handles);
+
+
+% --- Executes on button press in cad_button.
+function cad_button_Callback(hObject, eventdata, handles)
+% hObject    handle to cad_button (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+% condition needed => only do cadence if doing movement => modes not empty 
 
-% --- Executes on button press in cadence_button.
-function cadence_button_Callback(hObject, eventdata, handles)
-% hObject    handle to cadence_button (see GCBO)
+if(isequal(handles.loaded,1))
+    
+    if(~isequal(handles.cropped,1))
+
+        if(isequal(handles.extraction,0))
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            handles.extraction=1;
+        end
+        total=handles.left+handles.right+0.5; %+0.5 step
+
+        if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
+            k=1;
+            while(k<=length(handles.startCadTime))
+                convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
+                convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
+                k=k+1;
+            end
+
+            starts_num=getTimeDoubles(handles.wkv,convertedStarts);
+            ends_num=getTimeDoubles(handles.wkv,convertedEnds);
+
+            k=1; timeDiff=[];
+            while(k<=length(handles.startCadTime))
+                timeDiff(k)=ends_num(k)-starts_num(k);
+                cad(k)=total/timeDiff(k);
+                ctext{1,k}=sprintf('In zone %d: %.2f steps/time unit', k, cad(k));
+                k=k+1;
+            end
+
+            set(handles.cadtext, 'String', ctext);
+
+        else
+            f = msgbox('Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Cadence Functionality Unoperational.'); 
+        end
+    else
+        f=msgbox('You have cropped your data set. Please "Save to Browser" and reopen cropped data in Preview for analysis. consider looking at a broader selection.','Necessary to "Save to Browser" and "Preview" to proceed with analysis.'); 
+        
+    end
+end
+
+guidata(hObject, handles);
+
+
+% --- Executes on button press in timebox.
+function timebox_Callback(hObject, eventdata, handles)
+% hObject    handle to timebox (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of timebox
+
+
+% --- Executes on button press in allbox.
+function allbox_Callback(hObject, eventdata, handles)
+% hObject    handle to allbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of allbox
+
+
+% --- Executes on button press in avbox.
+function avbox_Callback(hObject, eventdata, handles)
+% hObject    handle to avbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of avbox
