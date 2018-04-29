@@ -318,7 +318,7 @@ if(isequal(handles.loaded,1))
         %current line of the text file is after the desired first date
         %extracted from the subwkv or after the desired last date.
         
-        [passed_first] = date_skipped_check(secs, min, h, d,first_secs,first_min, first_hour, first_day);
+        [passed_first] = dateSkippedCheck(secs, min, h, d,first_secs,first_min, first_hour, first_day);
         
         if(strcmp(txt_date,txt_first) || isequal(passed_first,1))
             handles.subtxt={};
@@ -336,7 +336,7 @@ if(isequal(handles.loaded,1))
                 h=str_elements{1,2}; min=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
                 getDay=strsplit(str_elements{1,1},'-');
                 d=getDay{1,3};
-                [passed_last] = date_skipped_check(secs, min, h, d,last_secs,last_min, last_hour, last_day);
+                [passed_last] = dateSkippedCheck(secs, min, h, d,last_secs,last_min, last_hour, last_day);
         
                 handles.subtxt{end+1,1}=entry;
                 index=index+1;
@@ -362,7 +362,9 @@ if(isequal(handles.loaded,1))
         dlg_title= 'Text File Number Choice';
         num_lines=1;
         answer=inputdlg(prompt,dlg_title,num_lines);
-
+        
+        handles.selectionID=answer{1};
+        
         Name=strcat('log_',answer{1},'_info.txt')
         if(~ (exist(Name, 'file') == 2))
             handles.subtxtName=Name; 
@@ -417,7 +419,11 @@ function save_button_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %%
 if(isequal(handles.loaded,1))
-    [filename, path]=uiputfile;
+    %[filename, path]=uiputfile;
+    
+    path=uigetdir(matlabroot, 'Choose where your log selection will be saved,');
+    filename=strcat('log_',handles.selectionID,'.mat');
+    
     newfilename = fullfile(path, filename);
     logs=handles.subwkv;
     try 
@@ -532,7 +538,7 @@ if(isequal(handles.loaded,1))
     if(~isequal(handles.cropped,1))
         %get from txt file all the modes entered in this data
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
             handles.extraction=1;
             
             disp('step1');
@@ -625,7 +631,7 @@ if(isequal(handles.loaded,1))
     
     if(~isequal(handles.cropped,1))
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime,handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime,handles.LeftS, handles.RightS]=extraction(handles.textfile);
             handles.extraction=1;
         end
 
@@ -693,7 +699,7 @@ if(isequal(handles.loaded,1))
     if(~isequal(handles.cropped,1))
 
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=mode_extraction(handles.textfile);
+            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
             handles.extraction=1;
         end
         total=handles.left+handles.right+0.5; %+0.5 step

@@ -1,4 +1,4 @@
-function [dates,modes,colors,endMode,left,right,startCadTime,endCadTime, LeftS, RightS] = mode_extraction(txt)
+function [dates,modes,colors,endMode,left,right,startCadTime,endCadTime, LeftS, RightS] = extraction(txt)
 
 %modes: for testing for logs3 index can be 890
 %initialisation

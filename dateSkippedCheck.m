@@ -1,4 +1,4 @@
-function [passed] = date_skipped_check(secs, min, h, d,wanted_secs,wanted_min, wanted_hour, wanted_day)
+function [passed] = dateSkippedCheck(secs, min, h, d,wanted_secs,wanted_min, wanted_hour, wanted_day)
 
 %number conversion of all the date data
 secs=str2num(secs); min=str2num(min); h=str2num(h); d=str2num(d); 

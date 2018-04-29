@@ -108,8 +108,8 @@ guidata(hObject, handles);
 function addbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to addbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-handles.filelist.Max=2;
+%handles.filelist.Max=2;
+set(handles.filelist, 'Max', 2);
 try
       %load appropriate file
       [filename, path]=uigetfile('*.mat','Select the MATLAB code file', 'MultiSelect' , 'on');
