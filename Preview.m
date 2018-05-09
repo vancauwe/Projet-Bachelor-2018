@@ -63,12 +63,13 @@ handles.loaded=0;
 
 handles.extraction=0;
 
-
 handles.ends_num={}; handles.starts_num={}; handles.toPlotTimes={}; 
 handles.LeftS_num={}; handles.RightS_num={}; handles.endMode_num={};
 handles.current_operation='none';
 
 handles.all=0;
+
+handles.selection=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -112,6 +113,7 @@ function timeline_button_Callback(hObject, eventdata, handles)
 try
       %first load the file corresponding to the name handles.fileToAnalyse
       handles.input=load(handles.fileToAnalyse{1});
+      handles.original=handles.fileToAnalyse{1};
       
       %variable that allows to know if file has been loaded: so as to not
       %be able to ask for the scroll to change if variable has not been
@@ -143,19 +145,13 @@ catch
     errordlg(['There was a problem loading the file.'],'Load Error!');
    return;
 end
-%%
-%Linking x axis of timeline and analysisAxis
+%% Linking x axis of timeline and analysisAxis
 ax=[handles.Log_timeline, handles.analysisAxis];
 linkaxes(ax,'x');
 %%
-%ADAPTING TO FILE => make subwkv have txt later on. DONE
-%if(handles.dim1~=1)
 handles.wkv=handles.input.logs(handles.LogIndex).wkv;
-%else
-    %wkv=handles.input.logs;
-%end
-%%
-%LOADING TXT FILE
+
+%% LOADING TXT FILE
 
 %Assumption: txt file attached to log .mat file will always be in same directory
 %get directory path
@@ -176,6 +172,7 @@ while(i<=numOfFiles)
         found = filesInDir(i).name;
         filename = fullfile(directory, found);
         handles.textfile=importdata(filename, '\t');
+        handles.originalLogID=str_elements{1,2};
         break;
     else
         found=[];
@@ -190,8 +187,7 @@ end
 
 
 
-%%
-% INTERACTIVE TIMELINE
+%% INTERACTIVE TIMELINE
 
 % Find the timestamp index.
 timeIndex = find(strcmp({handles.wkv.name}, 'timestamp'), 1);
@@ -229,8 +225,14 @@ if(handles.val~= '-')
     % Plot and get the two clicks locations.
     axes(handles.Log_timeline);
     xlabel('Time [us]');
-    %%% 5 should be determined to be a choice representaition
-    ylabel(string(handles.wkv(varIndex).name));
+    ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
+    ytitle_split2=split(ytitle_split1{end}, '_');
+    i=2; ytitle=ytitle_split2{1,1}
+    while(i<=length(ytitle_split2))
+        ytitle=strcat(ytitle, {' '}, ytitle_split2{i,1});
+        i=i+1;
+    end
+    ylabel(ytitle{1});
 end
 
 guidata(hObject, handles);
@@ -250,7 +252,8 @@ function select_button_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 if(isequal(handles.loaded,1))
     %%
-    %if(handles.dim1~=1)
+    %a boolean indicating the selection occurred 
+    handles.selection=1;
     
     %reinitialize analysis and cycles
     handles.extraction=0;
@@ -259,12 +262,9 @@ if(isequal(handles.loaded,1))
     set(handles.modestext, 'String', {});
     handles.cycles={};
     handles.all=0;
-    
-    
+   
+
     wkv=handles.input.logs(handles.LogIndex).wkv;
-    %else
-        %wkv=handles.input.logs;
-    %end
 
     %%
 
@@ -400,7 +400,6 @@ if(isequal(handles.loaded,1))
     %WKV HANDLE REALLOCATED TO THE CUT UP VERSION, same for the textfile index 
     handles.wkv=handles.subwkv.wkv;
     handles.textfile=handles.subtxt; 
-    %disp(handles.subwkv.wkv.name)
     %i.e. the selection is irreversible.
 
     %%
@@ -421,8 +420,15 @@ if(isequal(handles.loaded,1))
         % Plot and get the two clicks locations.
         axes(handles.Log_timeline);
         xlabel('Time [us]');
-        %%% 5 should be determined to be a choice representaition
-        ylabel(string(handles.wkv(handles.varIndex).name));
+        %TO DO: Adapt title to make underscores cleaner
+        ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
+        ytitle_split2=split(ytitle_split1{end}, '_');
+        i=2; ytitle=ytitle_split2{1,1}
+        while(i<=length(ytitle_split2))
+            ytitle=strcat(ytitle, {' '}, ytitle_split2{i,1});
+            i=i+1;
+        end
+        ylabel(ytitle{1});
     end
 end
 
@@ -439,47 +445,171 @@ function save_button_Callback(hObject, eventdata, handles)
 if(isequal(handles.loaded,1))
     %[filename, path]=uiputfile;
     
-    path=uigetdir(matlabroot, 'Choose where your log selection will be saved,');
-    filename=strcat('log_',handles.selectionID,'.mat');
-    
-    newfilename = fullfile(path, filename);
-    logs=handles.subwkv;
-    try 
-        save(newfilename, 'logs');
+    if(isequal(handles.selection,1))
+        path=uigetdir(matlabroot, 'Choose where your log selection will be saved,');
+        filename=strcat('log_',handles.selectionID,'.mat');
 
-        currentList=get(handles.currentFileList, 'String');
+        newfilename = fullfile(path, filename);
+        logs=handles.subwkv;
+        try 
+            save(newfilename, 'logs');
 
-        newFileList = [currentList; cellstr(newfilename) ];
-        %set(handles.currentfilelist, 'String', handles.Files);
-        %newFileList = handles.currentFileList;
+            currentList=get(handles.currentFileList, 'String');
+
+            newFileList = [currentList; cellstr(newfilename) ];
+            %set(handles.currentfilelist, 'String', handles.Files);
+            %newFileList = handles.currentFileList;
 
 
-        set(handles.currentFileList, 'String', newFileList);
-        setappdata(handles.h,'filelist', handles.currentFileList);
-    catch
-        errordlg(['There was a problem saving the mat file.'],'Save Error!');
-        return;
-    end
-
-    try
-        txtToSave=fullfile(path,handles.subtxtName);
-
-        fileID=fopen(txtToSave,'w');
-        S=handles.subtxt;
-        i=1;
-        while(i<= length(handles.subtxt))
-
-            fprintf(fileID,'%s\n', S{i,1});
-            i=i+1;
+            set(handles.currentFileList, 'String', newFileList);
+            setappdata(handles.h,'filelist', handles.currentFileList);
+        catch
+            errordlg(['There was a problem saving the mat file.'],'Save Error!');
+            return;
         end
-        fclose(fileID);
 
+        try
+            txtToSave=fullfile(path,handles.subtxtName);
+
+            fileID=fopen(txtToSave,'w');
+            S=handles.subtxt;
+            i=1;
+            while(i<= length(handles.subtxt))
+
+                fprintf(fileID,'%s\n', S{i,1});
+                i=i+1;
+            end
+            fclose(fileID);
+
+        catch
+            errordlg(['There was a problem saving the txt file.'],'Save Error!');
+            return;
+        end
+    end
+ %% Saving Data   
+    try
+        if(isequal(handles.extraction,1))
+            
+            if(isequal(handles.selection,1))
+                %path and selectionID will exist if selection made
+                datafilename=strcat('log_',handles.selectionID,'_data.txt');
+            else
+                %be able to save data of a file that has not been cropped
+                [directory,~,~]=fileparts(handles.original);
+                path=directory;
+                datafilename=strcat('log_',handles.originalLogID,'_data.txt');
+            end
+
+            datasaved = fullfile(path, datafilename);
+            fileID=fopen(datasaved,'w');
+            
+            modedata=get(handles.modestext, 'string');
+            if(~isequal(modedata, 'Modes Data'))
+                fprintf(fileID,'%s\n', 'Modes: ');
+                i=1;
+                while(i<=length(modedata))
+                    fprintf(fileID,'%s\n', modedata{i,1});
+                    i=i+1;
+                end
+            end
+            
+            stepdata=get(handles.stepstext, 'string');
+            if(~isequal(stepdata,'Steps Data'))
+                fprintf(fileID,'%s\n', 'Steps: ');
+                i=1;
+                while(i<=length(stepdata))
+                    fprintf(fileID,'%s\n', stepdata{i,1});
+                    i=i+1;
+                end      
+            end
+            
+            caddata= get(handles.cadtext, 'string');
+            if(~isequal(caddata, 'Cadence Data'))
+                fprintf(fileID,'%s\n', 'Cadences: ');
+                i=1;
+                while(i<=length(caddata))
+                    fprintf(fileID,'%s\n',caddata{i,1});
+                    i=i+1;
+                end
+            end
+            
+            if(isequal(handles.selection,1))
+                selectiontext=strcat('This data corresponds to a selection. Original file: ', handles.original);
+                fprintf(fileID,'%s\n', selectiontext);
+            end
+            
+            fclose(fileID);
+        end
     catch
-        errordlg(['There was a problem saving the txt file.'],'Save Error!');
+        errordlg('There was a problem saving the data file.','Save Error!');
         return;
     end
+
+%% Timeline with analysis
+set(handles.timebox, 'value',1);
+
+timebox_Callback(handles.timebox, eventdata, handles);
+mode_button_Callback(handles.mode_button, eventdata, handles);
+button_Callback(handles.button, eventdata, handles);
+cad_button_Callback(handles.cad_button, eventdata, handles);
+
+if(isequal(handles.selection,1))
+    %path and selectionID will exist if selection made
+    imagename=strcat('log_',handles.selectionID,'_timeline');
+else
+    %be able to save data of a file that has not been cropped
+    [directory,~,~]=fileparts(handles.original);
+    path=directory;
+    imagename=strcat('log_',handles.originalLogID,'_timeline');
 end
-guidata(hObject, handles);
+timesaved = fullfile(path, imagename);
+set(gcf,'PaperPositionMode','auto');
+saveas(gcf,timesaved,'png');
+
+%% Saving All Cycles
+set(handles.allbox, 'value',1);
+allbox_Callback(handles.allbox, eventdata, handles);
+if(isequal(handles.selection,1))
+    %path and selectionID will exist if selection made
+    imagename=strcat('log_',handles.selectionID,'_average_variance');
+else
+    %be able to save data of a file that has not been cropped
+    [directory,~,~]=fileparts(handles.original);
+    path=directory;
+    imagename=strcat('log_',handles.originalLogID,'_average_variance');
+end
+averagesaved = fullfile(path, imagename);
+set(gcf,'PaperPositionMode','auto');
+saveas(gcf,averagesaved,'png');
+
+%% Saving Graph Average
+%plot average graph
+%plot all graph 
+set(handles.avbox, 'value',1);
+avbox_Callback(handles.avbox, eventdata, handles);
+%fig=handles.Log_timeline;
+%axes(handles.Log_timeline);
+
+if(isequal(handles.selection,1))
+    %path and selectionID will exist if selection made
+    imagename=strcat('log_',handles.selectionID,'_all_cycles');
+else
+    %be able to save data of a file that has not been cropped
+    [directory,~,~]=fileparts(handles.original);
+    path=directory;
+    imagename=strcat('log_',handles.originalLogID,'_all_cycles');
+end
+allsaved = fullfile(path, imagename);
+set(gcf,'PaperPositionMode','auto');
+saveas(gcf,allsaved,'png');
+
+
+end
+
+delete(handles.figure1);
+
+
+
 %%
 % --- Executes during object creation, after setting all properties.
 function select_button_CreateFcn(hObject, eventdata, handles)
@@ -499,10 +629,10 @@ function variableChoice_Callback(hObject, eventdata, handles)
 % hObject    handle to variableChoice (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-%%
+%% Get the index name
 contents = cellstr(get(handles.variableChoice,'String'));
 handles.val=contents{get(handles.variableChoice,'Value')};
-%%
+%% Get the index from wkv
 %call function to get values and index => wkv_get must be in the same
 %folder as the GUI Preview
 if(~exist('wkv_get.m', 'file'))
@@ -515,15 +645,82 @@ else
         [~, handles.varIndex]=wkv_get(handles.wkv, handles.val);
     end
 end
-%%
+%% Plot on Timeline
 if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
+    %add timebox checked condition
+    hold off;
     handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
     set(handles.timebox,'value',1)
     % Plot and get the two clicks locations.
     axes(handles.Log_timeline);
     xlabel('Time [us]');
     %%% 5 should be determined to be a choice representaition
-    ylabel(string(handles.wkv(handles.varIndex).name));
+    ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
+    ytitle_split2=split(ytitle_split1{end}, '_');
+    i=2; ytitle=ytitle_split2{1,1}
+    while(i<=length(ytitle_split2))
+        ytitle=strcat(ytitle, {' '}, ytitle_split2{i,1});
+        i=i+1;
+    end
+    ylabel(ytitle{1});
+end
+
+%% Plot Cycles
+if(~isequal(handles.val, '-') && isequal(handles.loaded,1) && (isequal(get(handles.avbox, 'value'),1)|| isequal(get(handles.allbox, 'value'),1)))
+    set(handles.timebox, 'value',0);
+
+    nPoints=300*length(handles.cycles);
+    [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
+    %% Constants.
+    FILL_COLOR = [1 1 1] * 0.8; % Light gray.
+    
+%% Boolean both: Average and all cycles
+    both=(isequal(get(handles.avbox, 'value'),1) && isequal(get(handles.allbox, 'value'),1));
+    
+    if(isequal(both,1))             
+        %% Compute the mean and std curves.
+        m = mean(handles.stackedCycles, 1);
+        standardDeviation = std(handles.stackedCycles, 1);
+        mstdp = m + standardDeviation;
+        mstdm = m - standardDeviation;
+
+        %% Plot.
+        % Mean and standard deviation envelope.
+        axes(handles.Log_timeline);
+        fill([handles.times fliplr(handles.times)], [mstdm fliplr(mstdp)], ...
+             FILL_COLOR, 'EdgeColor','None');
+        hold on;
+        plot(handles.times, m, 'black', 'LineWidth', 2);
+        %% Plot All the curves.
+        axes(handles.Log_timeline);
+        plot(handles.times, handles.stackedCycles);
+        hold on 
+    end
+    
+%% Only average and variance of cycles   
+    if(isequal(get(handles.avbox, 'value'),1) && isequal(both,0))
+         %% Compute the mean and std curves.
+        m = mean(handles.stackedCycles, 1);
+        standardDeviation = std(handles.stackedCycles, 1);
+        mstdp = m + standardDeviation;
+        mstdm = m - standardDeviation;
+        %% Plot.
+        % Mean and standard deviation envelope.
+        axes(handles.Log_timeline);
+        fill([handles.times fliplr(handles.times)], [mstdm fliplr(mstdp)], ...
+             FILL_COLOR, 'EdgeColor','None');
+        hold on;
+        plot(handles.times, m, 'black', 'LineWidth', 2);
+    end
+    
+%% Only all cycles
+    if(isequal(get(handles.allbox, 'value'),1) && isequal(both,0))
+         % All the curves.
+        axes(handles.Log_timeline);
+        plot(handles.times, handles.stackedCycles);
+        hold on
+    end
+                
 end
 
 guidata(hObject, handles);
@@ -562,7 +759,7 @@ if(isequal(handles.loaded,1))
             handles.extraction=1;
 
 
-            if(~(isequal(handles.endMode, ' '))) 
+            if(~(isempty(handles.endMode))) 
                 k=1;
                 while(k<=length(handles.endMode))
                     converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
@@ -620,51 +817,67 @@ if(isequal(handles.loaded,1))
             handles.current_operation='mode';
             
             if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
-                 f = msgbox('Your selection does not comprise enough input to identify the modes: consider looking at a broader selection. Suggestion: analyse the whole data set to make an appropriate selection.','Mode Functionality Unoperational.'); 
+                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
             end
             
             if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox('Your selection does not comprise any steps: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Steps Functionality Unoperational.');       
+                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
             end
                     
             if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
-               f = msgbox('Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Cadence Functionality Unoperational.');            
+               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
             end
         end
 
         if(~isempty(handles.toPlotTimes)&& ~isempty(handles.endMode_num))
 
            %need ToPlotTimes and ends_num: Condition
-           
-            axes(handles.Log_timeline);
-            handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
-            set(handles.timebox,'value',1);
-            hold on
-            ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-            ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-            y=[ymin,ymax]; %height of the curves
-            ind=1;
-            
-            
-            while(ind<=length(handles.toPlotTimes) && ind<=length(handles.endMode_num))
-                xval=handles.toPlotTimes(ind);
-
+           if(isequal(get(handles.timebox, 'value'),1))
                 axes(handles.Log_timeline);
-                x=[xval,xval];
-                handles.timeline= plot(x,y, handles.colors{1,ind});
-
-                %second axis
-                x_analysis=[xval, handles.endMode_num(ind)];
-                axes(handles.analysisAxis);
-                xlim manual;
-                ylim([0,1]);
+                handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
+                set(handles.timebox,'value',1);
                 hold on
-                plot(x_analysis, [0.5,0.5],handles.colors{1,ind}, 'Linewidth',5);
-                hold off
+                ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+                ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+                y=[ymin,ymax]; %height of the curves
+           end 
+            
+            ind=1;
+            while(ind<=length(handles.toPlotTimes) && ind<=length(handles.endMode_num))
+                 if(isequal(get(handles.timebox, 'value'),1))
+                    xval=handles.toPlotTimes(ind);
 
+                    axes(handles.Log_timeline);
+                    x=[xval,xval];
+                    handles.timeline= plot(x,y, handles.colors{1,ind});
 
-                mtext{1,ind}=sprintf('%s : %s ', handles.modes{1,ind},handles.colors{1,ind});
-                ind=ind+1;
+                    %second axis
+                    x_analysis=[xval, handles.endMode_num(ind)];
+                    axes(handles.analysisAxis);
+                    xlim manual;
+                    ylim([0,1]);
+                    hold on
+                    plot(x_analysis, [0.5,0.5],handles.colors{1,ind}, 'Linewidth',5);
+                    hold off
+                 end
+                 
+                 %we presume that the mode is new, if this is not the case
+                 %then the while loop below will prove so.
+                 u=1; new=1; 
+                 while(u<ind)
+                     newmode=isequal(handles.modes{1,u},handles.modes{1,ind});
+                     %it is enough to have on equality to know that the
+                     %mode and its color will already be listed in mtext
+                     if(isequal(newmode,1))
+                         new=0;
+                     end
+                     u=u+1;
+                 end
+                 if(isequal(new,1))
+                    mtext{1,ind}=sprintf('%s : %s ', handles.modes{1,ind},handles.colors{1,ind});
+                 end
+
+                 ind=ind+1;
             end
             mtext;
             set(handles.modestext, 'String', mtext);
@@ -751,41 +964,43 @@ if(isequal(handles.loaded,1))
             
             handles.current_operation='steps';
             
-            if(isempty(handles.dates) && (isequal(handles.endMode, ' ')) && isequal(handles.current_operation,'mode'))
-                 f = msgbox('Your selection does not comprise enough input to identify the modes: consider looking at a broader selection. Suggestion: analyse the whole data set to make an appropriate selection.','Mode Functionality Unoperational.'); 
+            if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
+                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
             end
             
             if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox('Your selection does not comprise any steps: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Steps Functionality Unoperational.');       
+                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
             end
                     
-            if((isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')) && isequal(handles.current_operation,'cad'))
-               f = msgbox('Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Cadence Functionality Unoperational.');            
+            if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
+               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
             end
         end
 
 
         if(~isempty(handles.LeftS_num) && ~isempty(handles.RightS_num))
             k=1; j=1;
-            hold on
-            while(k<=length(handles.RightS_num))
-               axes(handles.analysisAxis);
-               xlim manual;
-               ylim([0,1]);
-               hold on
-               plot([handles.RightS_num(k),handles.RightS_num(k)],[0.5,0.5], 'ko');
-               k=k+1;
+            if(isequal(get(handles.timebox, 'value'),1))
+                hold on
+                while(k<=length(handles.RightS_num))
+                   axes(handles.analysisAxis);
+                   xlim manual;
+                   ylim([0,1]);
+                   hold on
+                   plot([handles.RightS_num(k),handles.RightS_num(k)],[0.5,0.5], 'ko');
+                   k=k+1;
+                end
+
+                while(j<=length(handles.LeftS_num))
+                   axes(handles.analysisAxis);
+                   xlim manual;
+                   ylim([0,1]);
+                   hold on
+                   plot([handles.LeftS_num(j),handles.LeftS_num(j)],[0.5,0.5], 'k*');
+                   j=j+1;
+                 end
+                hold off;
             end
-            
-            while(j<=length(handles.LeftS_num))
-               axes(handles.analysisAxis);
-               xlim manual;
-               ylim([0,1]);
-               hold on
-               plot([handles.LeftS_num(j),handles.LeftS_num(j)],[0.5,0.5], 'k*');
-               j=j+1;
-             end
-            hold off;
             stext{1,1}=sprintf('Left steps : %d ', handles.left);
             stext{1,2}=sprintf('Right steps : %d ', handles.right);
             set(handles.stepstext, 'String', stext);
@@ -795,7 +1010,7 @@ if(isequal(handles.loaded,1))
             axes(handles.Log_timeline);
             hold off
         else
-            f = msgbox('Your selection does not comprise any steps: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Steps Functionality Unoperational.');       
+            f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
         end
        
     
@@ -819,7 +1034,7 @@ if(isequal(handles.loaded,1))
             handles.extraction=1;
             
 
-            if(~(isequal(handles.endMode, ' '))) 
+            if(~(isempty(handles.endMode))) 
                 k=1;
                 while(k<=length(handles.endMode))
                     converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
@@ -876,16 +1091,16 @@ if(isequal(handles.loaded,1))
             
             handles.current_operation='cad';
             
-            if(isempty(handles.dates) && (isequal(handles.endMode, ' ')) && isequal(handles.current_operation,'mode'))
-                 f = msgbox('Your selection does not comprise enough input to identify the modes: consider looking at a broader selection. Suggestion: analyse the whole data set to make an appropriate selection.','Mode Functionality Unoperational.'); 
+            if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
+                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
             end
             
             if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox('Your selection does not comprise any steps: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Steps Functionality Unoperational.');       
+                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
             end
                     
-            if((isequal(handles.startCadTime, ' ')) && (isequal(handles.endCadTime, ' ')) && isequal(handles.current_operation,'cad'))
-               f = msgbox('Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Cadence Functionality Unoperational.');            
+            if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
+               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
             end
             
         end
@@ -896,15 +1111,18 @@ if(isequal(handles.loaded,1))
             
             k=1; timeDiff=[];
             while(k<=length(handles.startCadTime))
+                %timeDiff is in seconds
                 timeDiff(k)=handles.ends_num(k)-handles.starts_num(k);
+                timeDiff(k)=timeDiff(k)/60; %conversion to minutes
+                
                 cad(k)=total/timeDiff(k);
-                ctext{1,k}=sprintf('In zone %d: %.2f steps/time unit', k, cad(k));
+                ctext{1,k}=sprintf('In zone %d: %.2f steps/min', k, cad(k));
                 k=k+1;
             end
 
             set(handles.cadtext, 'String', ctext);
         else
-             f = msgbox('Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection. \n Suggestion: analyse the whole data set to make an appropriate selection.','Cadence Functionality Unoperational.');            
+             f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
         end
         
 end
@@ -952,7 +1170,7 @@ if(isequal(handles.loaded,1))
             handles.extraction=1;
             
 
-            if(~(isequal(handles.endMode, ' '))) 
+            if(~(isempty(handles.endMode))) 
                 k=1;
                 while(k<=length(handles.endMode))
                     converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
@@ -1020,17 +1238,18 @@ if(isequal(handles.loaded,1))
                 % 1 get cycles
                 handles.cycles = wkv_split_cycles_from_txt(handles.wkv, 'controller/right_motorboard/joint_angle_a_knee',indices);
                 
-                cycleTest=handles.cycles;
-                save('cycleTest.mat', 'cycleTest');
+                %Test for cycles - remove from final code
+                %cycleTest=handles.cycles;
+                %save('cycleTest.mat', 'cycleTest');
                 
                 % 2 use get to obtain index of the variable of each cycle that is to be
                 % plotted when cycles stacked
-                [~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
+                %[~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
                 %i.e. the handles.val => adapt in variableChoice_Callback
 
                 % 3 stack cycles
                 nPoints=300*length(handles.cycles);
-                [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, varIndex, nPoints);
+                [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
                 %% Check the function arguments.
                 if ~isvector(handles.times)
                     error('times should be a vector.');
@@ -1049,8 +1268,19 @@ if(isequal(handles.loaded,1))
             % All the curves.
             axes(handles.Log_timeline);
             plot(handles.times, handles.stackedCycles);
+            
+            [num, ~]=size(handles.stackedCycles);
+            i=1; %labels=zeros(num,1);
+            while(i<=num)
+                labels{i}=strcat('Cycle ' , num2str(i));
+                i=i+1;
+            end
+            legend(labels, 'Location', 'southeast');
+            
             hold on
+            
            end
+
         end 
 end
 guidata(hObject, handles);
@@ -1076,7 +1306,7 @@ if(isequal(handles.loaded,1))
             handles.extraction=1;
             
 
-            if(~(isequal(handles.endMode, ' '))) 
+            if(~(isempty(handles.endMode))) 
                 k=1;
                 while(k<=length(handles.endMode))
                     converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
@@ -1139,22 +1369,25 @@ if(isequal(handles.loaded,1))
             indices=transpose(sort([handles.ind_RightS handles.ind_LeftS]));
             %wkv_split will do: indices=(2:end); take away first ending step because we do not know where it starts
 
-            if(~isequal(handles.all,1))
+            if(~isequal(handles.all,1) && ~isequal(handles.varIndex,'-'))
                 handles.all=1;
                 % 1 get cycles
+                %take away splittingVar, not useful
                 handles.cycles = wkv_split_cycles_from_txt(handles.wkv, 'controller/right_motorboard/joint_angle_a_knee',indices);
                 
+                %Testing code:
                 cycleTest=handles.cycles;
                 save('cycleTest.mat', 'cycleTest');
                 
                 % 2 use get to obtain index of the variable of each cycle that is to be
                 % plotted when cycles stacked
-                [~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
+                %[~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
                 %i.e. the handles.val => adapt in variableChoice_Callback
 
                 % 3 stack cycles
+                
                 nPoints=300*length(handles.cycles);
-                [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, varIndex, nPoints);
+                [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
                 %% Check the function arguments.
                 if ~isvector(handles.times)
                     error('times should be a vector.');
@@ -1166,7 +1399,7 @@ if(isequal(handles.loaded,1))
                 end
             end
 
-            if(isequal(get(handles.avbox,'value'),1))
+            if(isequal(get(handles.avbox,'value'),1) && ~isequal(handles.varIndex,'-'))
                 %% Constants.
                 FILL_COLOR = [1 1 1] * 0.8; % Light gray.
 
@@ -1185,8 +1418,12 @@ if(isequal(handles.loaded,1))
                 hold on;
                 plot(handles.times, m, 'black', 'LineWidth', 2);
                 
-                %To indicate which cycle is which and use default colors of matlab: get(groot, 'defaultAxesColorOrder');
+                
             end
+        else
+            f = msgbox({'Cycle decomposition can only be done for one mode.'; ...
+                'Please select your data before visualizing cycles.'}, ...
+                'Cycle Requirement' );
         end
 end
 guidata(hObject, handles);

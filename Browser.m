@@ -22,7 +22,7 @@ function varargout = Browser(varargin)
 
 % Edit the above text to modify the response to help Browser
 
-% Last Modified by GUIDE v2.5 31-Mar-2018 20:13:33
+% Last Modified by GUIDE v2.5 09-May-2018 17:37:30
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -213,19 +213,29 @@ try
         return;
     end
     
+    %Saves text file with references to all files of album
+    albumname=strcat(answer{1},'.txt');
+    %album has the same name as the folder in which it is
+    album=fullfile(newFolder,albumname);
+    fileID=fopen(album,'w');
+    
+    Filenames = get(handles.filelist,'String');
     i=1;
     while( i<=length(albumIndexes))
-       Filenames = get(handles.filelist,'String');
-       fileToLoad=Filenames{albumIndexes(i)};
-       
-       [~,name,~]=fileparts(fileToLoad);
-       newPlace=fullfile(newFolder,name);
-       
-       fileToSave=load(fileToLoad);
-       save(newPlace, 'fileToSave');
-       i=i+1;
+
+       %Duplicates files
+       %fileToLoad=Filenames{albumIndexes(i)};
+       %[~,name,~]=fileparts(fileToLoad);
+       %newPlace=fullfile(newFolder,name);
+       %fileToSave=load(fileToLoad);
+       %save(newPlace, 'fileToSave');
+
+       fileNameToSave=Filenames{albumIndexes(i)};
+       fprintf(fileID,'%s\n', fileNameToSave);
+       i=i+1;        
     end
-        
+    fclose(fileID);
+    % handles.textfile=importdata(filename, '\t');
 catch
     errordlg(['New Album folder could not be created.'],'Album Creation Error!');
     return;
@@ -266,3 +276,35 @@ else
 end
 guidata(hObject, handles);
     
+
+
+% --- Executes on button press in importbutton.
+function importbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to importbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.filelist, 'Max', 2);
+try
+      %load appropriate file
+      [filename, path]=uigetfile('*.txt','Select the album reference text file', 'MultiSelect' , 'on');
+      
+      if isequal(filename, 0)
+       %user canceled
+        return;
+      end
+      fileToOpen=fullfile(path,filename);
+      albumFiles=importdata(fileToOpen, '\t');
+      Filenames = get(handles.filelist,'String'); 
+      k=1;
+      while(k<=length(albumFiles))
+          handles.Files = [handles.Files; cellstr(albumFiles{k})  ];
+          k=k+1;
+      end
+      
+      set(handles.filelist, 'String', handles.Files);
+catch
+end
+
+
+
+guidata(hObject, handles);
