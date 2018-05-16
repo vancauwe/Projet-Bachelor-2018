@@ -22,7 +22,7 @@ function varargout = Preview(varargin)
 
 % Edit the above text to modify the response to help Preview
 
-% Last Modified by GUIDE v2.5 26-Apr-2018 19:28:19
+% Last Modified by GUIDE v2.5 16-May-2018 15:02:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -70,6 +70,9 @@ handles.current_operation='none';
 handles.all=0;
 
 handles.selection=0;
+
+axis(handles.videoaxes,'off');
+handles.user_quit=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -605,7 +608,7 @@ saveas(gcf,allsaved,'png');
 
 
 end
-
+handles.user_quit=1;
 delete(handles.figure1);
 
 
@@ -1429,3 +1432,73 @@ end
 guidata(hObject, handles);
 
 % Hint: get(hObject,'Value') returns toggle state of avbox
+
+
+% --- Executes on button press in videoImportbutton.
+function videoImportbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to videoImportbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.exitbutton,'Enable','off');
+
+[ video_file_name,video_file_path ] = uigetfile({'*.mp4'},'Pick a video file');   
+if(video_file_path == 0)
+    return;
+end
+input_video_file = [video_file_path,video_file_name];
+handles.videoObject = VideoReader(input_video_file);
+
+ frame_1 = readFrame(handles.videoObject);
+axes(handles.videoaxes);
+imshow(frame_1);
+drawnow;
+axis(handles.videoaxes,'off');
+
+guidata(hObject, handles);
+
+
+% --- Executes on button press in playbutton.
+function playbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to playbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% Display first frame
+%set(handles.pausebutton,'Enable','on');
+set(handles.videoImportbutton,'Enable','off');
+
+if(strcmp(get(handles.playbutton,'String'),'Play'))
+    set(handles.playbutton,'String','Pause');
+    handles.user_quit=0;
+    guidata(hObject, handles);
+
+else
+    set(handles.playbutton,'String','Play');
+    handles.user_quit=1;
+    guidata(hObject, handles);
+    set(handles.exitbutton,'Enable','on');
+    
+end
+
+%&& (~handles.user_quit)
+while (hasFrame(handles.videoObject) )
+    handles = guidata(hObject);
+    if(~handles.user_quit)
+        frame = readFrame(handles.videoObject);
+        imshow(frame);
+        drawnow; 
+    else
+        break;
+    end
+end
+guidata(hObject, handles);
+
+
+% --- Executes on button press in exitbutton.
+function exitbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to exitbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+delete(handles.figure1);
+
+
+
