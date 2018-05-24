@@ -22,7 +22,7 @@ function varargout = Preview(varargin)
 
 % Edit the above text to modify the response to help Preview
 
-% Last Modified by GUIDE v2.5 16-May-2018 15:02:42
+% Last Modified by GUIDE v2.5 23-May-2018 12:27:18
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -73,6 +73,11 @@ handles.selection=0;
 
 axis(handles.videoaxes,'off');
 handles.user_quit=0;
+
+axis(handles.leftloadcell,'off');
+axis(handles.rightloadcell,'off');
+handles.loadindex=1;
+handles.cutpersec=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -1501,4 +1506,94 @@ function exitbutton_Callback(hObject, eventdata, handles)
 delete(handles.figure1);
 
 
+% --- Executes on button press in playload.
+function playload_Callback(hObject, eventdata, handles)
+% hObject    handle to playload (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%call function to get values and index => wkv_get must be in the same
+%folder as the GUI Preview
 
+%Elaboration idea: have an average per second? 
+%
+i=handles.loadindex;
+if(isequal(handles.loaded,1))
+    if(~exist('wkv_get.m', 'file'))
+         errordlg(['Please place the file wkv_get.m in the same folder as this GUI.'],'Missing External .m file!');
+        return;
+    else
+        
+        if(strcmp(get(handles.playload,'String'),'Play'))
+            set(handles.playload,'String','Pause');
+            handles.user_quit=0;
+            guidata(hObject, handles);
+
+        else
+            set(handles.playload,'String','Play');
+            handles.user_quit=1;
+            guidata(hObject, handles);
+            set(handles.exitbutton,'Enable','on');
+
+        end
+        
+        handles = guidata(hObject);
+        if(~isequal(handles.cutpersec,1))
+            [handles.loadpersec,handles.stamps]=loadProcess(handles.wkv);
+            handles.cutpersec=1;
+            guidata(hObject, handles);
+        end
+        
+        while(i<=size(handles.stamps,2))
+            handles = guidata(hObject);
+            if(~handles.user_quit)
+                
+                aL=handles.loadpersec(i,1); bL=handles.loadpersec(i,2); cL=handles.loadpersec(i,3); dL=handles.loadpersec(i,4);
+                Row2L=[cL dL]; Row1L=[aL bL];
+                cdataL=[Row1L;Row2L]
+
+                aR=handles.loadpersec(i,5); bR=handles.loadpersec(i,6); cR=handles.loadpersec(i,7); dR=handles.loadpersec(i,8);
+                Row2R=[cR dR]; Row1R=[aR bR];
+                cdataR=[Row1R;Row2R]
+
+                handles = guidata(hObject);
+                if(~handles.user_quit)
+                axes(handles.leftloadcell);
+                imagesc(cdataL);
+                colormap(jet);
+                axis(handles.leftloadcell,'off');
+                drawnow;
+                end
+                
+                handles = guidata(hObject);
+                if(~handles.user_quit)
+                axes(handles.rightloadcell);
+                imagesc(cdataR);
+                colormap(jet);
+                axis(handles.rightloadcell,'off');
+                drawnow;
+                end
+                
+                handles = guidata(hObject);
+                if(~handles.user_quit)
+                set(handles.loadtime, 'String', datestr(handles.stamps(i)));
+                guidata(hObject, handles);
+                i=i+1;
+                end
+                
+                handles.loadindex=i;
+                %make everything start over
+                if(isequal(i,size(handles.stamps,2)))
+                    i=1;
+                    handles.loadindex=1;
+                end
+            else
+                handles.loadindex=i;
+                guidata(hObject, handles);
+                break;
+                
+            end
+        end
+
+    end
+end
+guidata(hObject, handles);
