@@ -22,7 +22,7 @@ function varargout = Preview(varargin)
 
 % Edit the above text to modify the response to help Preview
 
-% Last Modified by GUIDE v2.5 23-May-2018 12:27:18
+% Last Modified by GUIDE v2.5 26-May-2018 11:45:37
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -78,6 +78,8 @@ axis(handles.leftloadcell,'off');
 axis(handles.rightloadcell,'off');
 handles.loadindex=1;
 handles.cutpersec=0;
+
+handles.markedFnum=0;
 end
 %check that the analysis_file is not empty? 
 
@@ -1450,14 +1452,24 @@ set(handles.exitbutton,'Enable','off');
 if(video_file_path == 0)
     return;
 end
-input_video_file = [video_file_path,video_file_name];
-handles.videoObject = VideoReader(input_video_file);
+handles.input_video_file = [video_file_path,video_file_name];
+handles.videoObject = VideoReader(handles.input_video_file);
 
- frame_1 = readFrame(handles.videoObject);
+%first frame has been read through import
+handles.f=1;
+handles.totalframes=get(handles.videoObject, 'NumberOfFrames');
+handles.fps=get(handles.videoObject, 'FrameRate');
+set(handles.scroll,'Min',0);
+set(handles.scroll,'Max',handles.videoObject.Duration);
+
+handles.videoObject = VideoReader(handles.input_video_file);
+%frame_1 = readFrame(handles.videoObject);
+frame_1=read(handles.videoObject,1);
 axes(handles.videoaxes);
 imshow(frame_1);
 drawnow;
 axis(handles.videoaxes,'off');
+
 
 guidata(hObject, handles);
 
@@ -1473,29 +1485,166 @@ set(handles.videoImportbutton,'Enable','off');
 
 if(strcmp(get(handles.playbutton,'String'),'Play'))
     set(handles.playbutton,'String','Pause');
+    set(handles.forwardbutton,'Enable','off');
+    set(handles.backbutton,'Enable','off');
+    set(handles.vidMbutton,'Enable','off');
+    set(handles.scroll, 'Enable', 'off');
+    
     handles.user_quit=0;
     guidata(hObject, handles);
 
 else
     set(handles.playbutton,'String','Play');
+    set(handles.forwardbutton,'Enable','on');
+    set(handles.backbutton,'Enable','on');
+    set(handles.vidMbutton,'Enable','on');
+    set(handles.scroll, 'Enable', 'on');
     handles.user_quit=1;
     guidata(hObject, handles);
     set(handles.exitbutton,'Enable','on');
     
 end
 
-%&& (~handles.user_quit)
-while (hasFrame(handles.videoObject) )
+axes(handles.videoaxes);
+
+for i=handles.f:handles.totalframes
     handles = guidata(hObject);
+    disp(handles.user_quit);
     if(~handles.user_quit)
-        frame = readFrame(handles.videoObject);
-        imshow(frame);
-        drawnow; 
+
+        handles.f=i;
+        guidata(hObject, handles);
+        handles = guidata(hObject);
+        set(handles.scroll, 'Value', handles.videoObject.CurrentTime);
+        guidata(hObject, handles);
+        handles = guidata(hObject);
+        
+        if(isequal(i,handles.markedFnum))
+            imshow(handles.markedFrame);
+            drawnow;
+            pause(0.02);
+        else
+        handles.frame = read(handles.videoObject,i);
+        guidata(hObject, handles);
+        imshow(handles.frame);
+        drawnow;
+        pause(0.07); 
+        end
+            
     else
         break;
     end
 end
+
 guidata(hObject, handles);
+
+% --- Executes on button press in forwardbutton.
+function forwardbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to forwardbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+axes(handles.videoaxes);
+%handles.videoObject = VideoReader(handles.input_video_file);
+handles = guidata(hObject);
+handles.frame=read(handles.videoObject,(handles.f+1));
+handles.f=(handles.f+1);
+imshow(handles.frame); 
+guidata(hObject, handles);
+
+
+
+% --- Executes on button press in backbutton.
+function backbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to backbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+axes(handles.videoaxes);
+
+handles = guidata(hObject);
+handles.frame=read(handles.videoObject,(handles.f-1));
+handles.f=(handles.f-1);
+imshow(handles.frame);
+drawnow; 
+
+guidata(hObject, handles);
+
+function scroll_Callback(hObject, eventdata, handles)
+% hObject    handle to scroll (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+handles = guidata(hObject);
+
+%old time
+oldTime=handles.videoObject.CurrentTime;
+%new time where scroll places
+newTime=get(handles.scroll,'Value');
+
+diff=newTime-oldTime;
+numofFrames=floor((diff)*handles.fps);
+handles.f=handles.f+numofFrames;
+
+handles.frame=read(handles.videoObject,handles.f);
+imshow(handles.frame);
+drawnow; 
+    
+guidata(hObject, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function scroll_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to scroll (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+
+% --- Executes on button press in vidMbutton.
+function vidMbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to vidMbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+%its role: memorize the currentTime at hand and the frame number
+%show visually the marker
+set(handles.timMbutton,'Enable','on');
+%sync condition?
+set(handles.syncbutton,'Enable','on');
+
+handles = guidata(hObject);
+handles.markedTime=handles.videoObject.CurrentTime;
+handles.markedFnum=handles.f;
+%result of insertMarker is an image
+handles.markedFrame=insertShape(handles.frame,'circle',[80 130 35],'LineWidth',20);
+%handles.markedFrame=insertMarker(handles.frame,[147 279], 'o', 'color', 'red','size', 100);
+imshow(handles.markedFrame);
+drawnow;
+guidata(hObject, handles);
+
+
+
+% --- Executes on button press in timMbutton.
+function timMbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to timMbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in syncbutton.
+function syncbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to syncbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on slider movement.
+
 
 
 % --- Executes on button press in exitbutton.
