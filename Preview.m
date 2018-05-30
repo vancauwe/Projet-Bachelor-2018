@@ -53,44 +53,64 @@ function Preview_OpeningFcn(hObject, eventdata, handles, varargin)
 % varargin   command line arguments to Preview (see VARARGIN)
 
 % Choose default command line output for Preview
+
+%% Info from Browser
 handles.output = hObject;
 handles.h = findobj('Tag','Browser');
+
+%only initialize all other variables if info from browser correctly
+%retrieved and not empty
 if ~isempty(handles.h)
 browserdata = guidata(handles.h);
 handles.fileToAnalyse = browserdata.analysis_file;
 handles.currentFileList=browserdata.filelist;
+
+%% Variable to indicate if certain important operations have been accomplished
 handles.loaded=0;
-
 handles.extraction=0;
+handles.selection=0;
+handles.all=0;
 
+%% Variable initialization for text treatment
 handles.ends_num={}; handles.starts_num={}; handles.toPlotTimes={}; 
 handles.LeftS_num={}; handles.RightS_num={}; handles.endMode_num={};
 handles.current_operation='none';
 
-handles.all=0;
-
-handles.selection=0;
-
+%% Variable initialization for video treatment
 axis(handles.videoaxes,'off');
 handles.user_quit=0;
-
+handles.markedFnum=0;
+handles.timemarker=0;
+handles.sync=0;
+%% Variable initialization for load cell data
 axis(handles.leftloadcell,'off');
 axis(handles.rightloadcell,'off');
 handles.loadindex=1;
 handles.cutpersec=0;
 
-handles.markedFnum=0;
-end
-%check that the analysis_file is not empty? 
-
-%If need be, the second handles structure can be updated from the first GUI by using
-%setappdata(Preview, handles);
+%% Button regulation
+%for video
+set(handles.playbutton, 'Enable', 'off');
+set(handles.forwardbutton,'Enable','off');
+set(handles.backbutton,'Enable','off');
+set(handles.vidMbutton,'Enable','off');
+set(handles.timMbutton,'Enable','off');
+set(handles.syncbutton, 'Enable', 'off');
+set(handles.scroll, 'Enable', 'off');
+%for timeline
+set(handles.avbox, 'Enable', 'off');
+set(handles.allbox, 'Enable', 'off');
+set(handles.timebox, 'Enable', 'off');
+set(handles.cad_button, 'Enable', 'off');
+set(handles.button, 'Enable', 'off');
+set(handles.mode_button, 'Enable', 'off');
+set(handles.save_button, 'Enable', 'off');
+set(handles.select_button, 'Enable', 'off');
+set(handles.playload, 'Enable', 'off');
+end 
 
 % Update handles structure
 guidata(hObject, handles);
-
-% UIWAIT makes Preview wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -110,8 +130,6 @@ function Log_timeline_CreateFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
-% Hint: place code in OpeningFcn to populate Log_timeline
-
 
 % --- Executes on button press in timeline_button.
 function timeline_button_Callback(hObject, eventdata, handles)
@@ -119,7 +137,7 @@ function timeline_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-%LOADING FILE DATA
+%% LOADING FILE DATA
 try
       %first load the file corresponding to the name handles.fileToAnalyse
       handles.input=load(handles.fileToAnalyse{1});
@@ -130,6 +148,8 @@ try
       %loaded::
       handles.loaded=1; 
       
+      %interactive selection of which wkv/log is to be processed if multiple
+      %wkvs/logs are present 
       [handles.dim1, ~]= size(handles.input.logs);
       if(handles.dim1~=1)
       
@@ -158,7 +178,7 @@ end
 %% Linking x axis of timeline and analysisAxis
 ax=[handles.Log_timeline, handles.analysisAxis];
 linkaxes(ax,'x');
-%%
+%% Affecting the selected wkv to its handle
 handles.wkv=handles.input.logs(handles.LogIndex).wkv;
 
 %% LOADING TXT FILE
@@ -228,10 +248,20 @@ else
     [~, varIndex]=wkv_get(handles.wkv, handles.val);
     end
 end
-%%
+%% Plotting
+% if no variable selected previously then plotting will occur when variable
+% selected later on via variableChoice_Callback
 if(handles.val~= '-')
-    handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(varIndex).values(handles.startIndex:end));
+    %make the first time zero
+    initialTime=handles.wkv(end).values(handles.startIndex);
+    %make this initialTime a zero reference:
+    times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+    handles.timeline =plot(times, handles.wkv(varIndex).values(handles.startIndex:end));
+    
+    %set the checkbox of the representation mode to "time representation"
+    set(handles.timebox, 'Enable', 'on');
     set(handles.timebox,'value',1);
+    
     % Plot and get the two clicks locations.
     axes(handles.Log_timeline);
     xlabel('Time [us]');
@@ -243,7 +273,19 @@ if(handles.val~= '-')
         i=i+1;
     end
     ylabel(ytitle{1});
+    
+    set(handles.avbox, 'Enable', 'on');
+    set(handles.allbox, 'Enable', 'on');
+    set(handles.cad_button, 'Enable', 'on');
+    set(handles.button, 'Enable', 'on');
+    set(handles.mode_button, 'Enable', 'on');
 end
+
+%% Set all buttons on since file and text file correctly loaded
+
+set(handles.save_button, 'Enable', 'on');
+set(handles.select_button, 'Enable', 'on');
+set(handles.playload, 'Enable', 'on');
 
 guidata(hObject, handles);
 
@@ -261,7 +303,7 @@ function select_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if(isequal(handles.loaded,1))
-    %%
+    %% Variable modification due to selection
     %a boolean indicating the selection occurred 
     handles.selection=1;
     
@@ -272,18 +314,25 @@ if(isequal(handles.loaded,1))
     set(handles.modestext, 'String', {});
     handles.cycles={};
     handles.all=0;
+    axes(handles.analysisAxis);
+    children = get(gca, 'children');
+    delete(children);
    
 
     wkv=handles.input.logs(handles.LogIndex).wkv;
 
-    %%
+    %% Cropping of the data of the wkv
 
     [t_crop, ~] = ginput(2);
 
     % Get the corresponding begin/end indices.
     beginIndex = 1;
     endIndex = length(wkv(end).values);
-
+    
+    initialTime=wkv(end).values(1);
+    %reestablish seconds for 
+    t_crop= t_crop+initialTime;
+    
     if t_crop(1) > t_crop(2)
         tmp = t_crop(1);
         t_crop(1) = t_crop(2);
@@ -312,7 +361,9 @@ if(isequal(handles.loaded,1))
         wkv(i).values = wkv(i).values(range);
     end
 
-    %%
+    %% Cropping of the data from txt file corresponding
+    
+    %intiialize a temporary text
     handles.subwkv = struct('wkv', wkv, 'txt', 'temporary');
 
     %handles.subtext
@@ -321,9 +372,7 @@ if(isequal(handles.loaded,1))
     last_time=handles.subwkv.wkv(1).values(end);
     %cut up timestamps to use info
     [txt_first, first_day, first_hour, first_min, first_secs]=timestampConversion(first_time);
-   
     [txt_last, last_day, last_hour, last_min, last_secs]=timestampConversion(last_time);
-    
     
     %Create handles.textfile (array of lines) to make the txt file associated to the subwkv
     index=1;
@@ -407,7 +456,8 @@ if(isequal(handles.loaded,1))
     %Creating the handle corresponding to cut up
     handles.subwkv = struct('wkv', wkv, 'txt', handles.subtxtName);
 
-    %WKV HANDLE REALLOCATED TO THE CUT UP VERSION, same for the textfile index 
+    %% Handles Reallocation due to IRREVERSIBLE selection
+    %WKV HANDLE REALLOCATED TO THE CUT UP VERSION, same for the textfile  
     handles.wkv=handles.subwkv.wkv;
     handles.textfile=handles.subtxt; 
     %i.e. the selection is irreversible.
@@ -425,12 +475,15 @@ if(isequal(handles.loaded,1))
     end
 
     if(handles.val~= '-')
-        handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
         set(handles.timebox,'value',1)
-        % Plot and get the two clicks locations.
+        %make the first time zero
+        initialTime=handles.wkv(end).values(handles.startIndex);
+        %make this initialTime a zero reference:
+        times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
         axes(handles.Log_timeline);
+        handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        % labels 
         xlabel('Time [us]');
-        %TO DO: Adapt title to make underscores cleaner
         ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
         ytitle_split2=split(ytitle_split1{end}, '_');
         i=2; ytitle=ytitle_split2{1,1}
@@ -439,45 +492,51 @@ if(isequal(handles.loaded,1))
             i=i+1;
         end
         ylabel(ytitle{1});
+        
+        set(handles.avbox, 'Enable', 'on');
+        set(handles.allbox, 'Enable', 'on');
+        set(handles.cad_button, 'Enable', 'on');
+        set(handles.button, 'Enable', 'on');
+        set(handles.mode_button, 'Enable', 'on');
     end
 end
 
 
 guidata(hObject, handles);
 
-%%
+
 % --- Executes on button press in save_button.
 function save_button_Callback(hObject, eventdata, handles)
 % hObject    handle to save_button (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-%%
+
 if(isequal(handles.loaded,1))
-    %[filename, path]=uiputfile;
+    
     
     if(isequal(handles.selection,1))
+        %select place where new data set will be saved
         path=uigetdir(matlabroot, 'Choose where your log selection will be saved,');
         filename=strcat('log_',handles.selectionID,'.mat');
 
         newfilename = fullfile(path, filename);
         logs=handles.subwkv;
+        
+        %% Save wkv 
         try 
             save(newfilename, 'logs');
 
             currentList=get(handles.currentFileList, 'String');
 
             newFileList = [currentList; cellstr(newfilename) ];
-            %set(handles.currentfilelist, 'String', handles.Files);
-            %newFileList = handles.currentFileList;
-
-
+           
             set(handles.currentFileList, 'String', newFileList);
             setappdata(handles.h,'filelist', handles.currentFileList);
         catch
             errordlg(['There was a problem saving the mat file.'],'Save Error!');
             return;
         end
-
+        %% Save txt
         try
             txtToSave=fullfile(path,handles.subtxtName);
 
@@ -496,7 +555,7 @@ if(isequal(handles.loaded,1))
             return;
         end
     end
- %% Saving Data   
+    %% Saving Analysis Data   
     try
         if(isequal(handles.extraction,1))
             
@@ -555,8 +614,13 @@ if(isequal(handles.loaded,1))
         return;
     end
 
-%% Timeline with analysis
+%% Timeline with analysis Image
 set(handles.timebox, 'value',1);
+set(handles.avbox, 'Enable', 'on');
+set(handles.allbox, 'Enable', 'on');
+set(handles.cad_button, 'Enable', 'on');
+set(handles.button, 'Enable', 'on');
+set(handles.mode_button, 'Enable', 'on');
 
 timebox_Callback(handles.timebox, eventdata, handles);
 mode_button_Callback(handles.mode_button, eventdata, handles);
@@ -576,7 +640,7 @@ timesaved = fullfile(path, imagename);
 set(gcf,'PaperPositionMode','auto');
 saveas(gcf,timesaved,'png');
 
-%% Saving All Cycles
+%% Saving All Cycles Image
 set(handles.allbox, 'value',1);
 allbox_Callback(handles.allbox, eventdata, handles);
 if(isequal(handles.selection,1))
@@ -592,13 +656,10 @@ averagesaved = fullfile(path, imagename);
 set(gcf,'PaperPositionMode','auto');
 saveas(gcf,averagesaved,'png');
 
-%% Saving Graph Average
-%plot average graph
-%plot all graph 
+%% Saving Graph Average Image
+%plot average graph 
 set(handles.avbox, 'value',1);
 avbox_Callback(handles.avbox, eventdata, handles);
-%fig=handles.Log_timeline;
-%axes(handles.Log_timeline);
 
 if(isequal(handles.selection,1))
     %path and selectionID will exist if selection made
@@ -609,7 +670,7 @@ else
     path=directory;
     imagename=strcat('log_',handles.originalLogID,'_all_cycles');
 end
-allsaved = fullfile(path, imagename);
+allsaved = fullfile(path, imagename); 
 set(gcf,'PaperPositionMode','auto');
 saveas(gcf,allsaved,'png');
 
@@ -620,7 +681,7 @@ delete(handles.figure1);
 
 
 
-%%
+
 % --- Executes during object creation, after setting all properties.
 function select_button_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to select_button (see GCBO)
@@ -655,14 +716,18 @@ else
         [~, handles.varIndex]=wkv_get(handles.wkv, handles.val);
     end
 end
-%% Plot on Timeline
+%% Plot on Timeline due to variable change
 if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
-    %add timebox checked condition
-    hold off;
-    handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
-    set(handles.timebox,'value',1)
-    % Plot and get the two clicks locations.
+    %make the first time zero
+    initialTime=handles.wkv(end).values(handles.startIndex);
+    %make this initialTime a zero reference:
+    times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
     axes(handles.Log_timeline);
+    hold off;
+    handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        
+    set(handles.timebox,'value',1);
+    % Plot and get the two clicks locations.
     xlabel('Time [us]');
     %%% 5 should be determined to be a choice representaition
     ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
@@ -673,18 +738,29 @@ if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
         i=i+1;
     end
     ylabel(ytitle{1});
+    
+    set(handles.avbox, 'Enable', 'on');
+    set(handles.allbox, 'Enable', 'on');
+    set(handles.cad_button, 'Enable', 'on');
+    set(handles.button, 'Enable', 'on');
+    set(handles.mode_button, 'Enable', 'on');
 end
 
-%% Plot Cycles
+%% Plot Cycles due to variable change
 if(~isequal(handles.val, '-') && isequal(handles.loaded,1) && (isequal(get(handles.avbox, 'value'),1)|| isequal(get(handles.allbox, 'value'),1)))
+    set(handles.timebox, 'Enable','on');
     set(handles.timebox, 'value',0);
-
+    set(handles.select_button, 'Enable', 'off');
+    
     nPoints=300*length(handles.cycles);
     [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
-    %% Constants.
+    %transform into a percentage time scale
+    handles.times= (100.*handles.times)./handles.times(end);
+    
+    % Constants.
     FILL_COLOR = [1 1 1] * 0.8; % Light gray.
     
-%% Boolean both: Average and all cycles
+    % Boolean both: Average and all cycles
     both=(isequal(get(handles.avbox, 'value'),1) && isequal(get(handles.allbox, 'value'),1));
     
     if(isequal(both,1))             
@@ -697,6 +773,7 @@ if(~isequal(handles.val, '-') && isequal(handles.loaded,1) && (isequal(get(handl
         %% Plot.
         % Mean and standard deviation envelope.
         axes(handles.Log_timeline);
+        xlabel('Cycle (2 steps) Percentage');
         fill([handles.times fliplr(handles.times)], [mstdm fliplr(mstdp)], ...
              FILL_COLOR, 'EdgeColor','None');
         hold on;
@@ -717,6 +794,7 @@ if(~isequal(handles.val, '-') && isequal(handles.loaded,1) && (isequal(get(handl
         %% Plot.
         % Mean and standard deviation envelope.
         axes(handles.Log_timeline);
+        xlabel('Cycle (2 steps) Percentage');
         fill([handles.times fliplr(handles.times)], [mstdm fliplr(mstdp)], ...
              FILL_COLOR, 'EdgeColor','None');
         hold on;
@@ -727,7 +805,15 @@ if(~isequal(handles.val, '-') && isequal(handles.loaded,1) && (isequal(get(handl
     if(isequal(get(handles.allbox, 'value'),1) && isequal(both,0))
          % All the curves.
         axes(handles.Log_timeline);
+        xlabel('Cycle (2 steps) Percentage');
         plot(handles.times, handles.stackedCycles);
+        [num, ~]=size(handles.stackedCycles);
+        i=1; 
+        while(i<=num)
+            labels{i}=strcat('Cycle ' , num2str(i));
+            i=i+1;
+        end
+        legend(labels, 'Location', 'northeast');
         hold on
     end
                 
@@ -735,10 +821,6 @@ end
 
 guidata(hObject, handles);
 
-% Hints: contents = cellstr(get(hObject,'String')) returns variableChoice contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from variableChoice
-
-%%
 % --- Executes during object creation, after setting all properties.
 function variableChoice_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to variableChoice (see GCBO)
@@ -751,6 +833,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+%initialize to no variable selected
 handles.val='-';
 guidata(hObject, handles);
 
@@ -761,90 +844,42 @@ function mode_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+%double preventive condition: button not "clickable" if not loaded.
 if(isequal(handles.loaded,1))
     
-        %get from txt file all the modes entered in this data
+        %% Get from txt file all the modes entered in this data
+        
+        %extraction must be done once to get all data. First run takes time
+        %operation of the function getTimeDoubles taking time is to process 
+        %the timestamps dates (wkv(1)) vs. time doubles (wkv(end))
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
             handles.extraction=1;
-
-
-            if(~(isempty(handles.endMode))) 
-                k=1;
-                while(k<=length(handles.endMode))
-                    converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
-                    k=k+1;
-                end
-            else
-                converted_endMode={};
-            end
-
-            if(~isempty(handles.dates))
-                %convert to a wkv timestamp format
-                i=1; 
-                while(i<=length(handles.dates))
-                    converted_dates{1,i}=matTimeConversion(handles.dates{1,i});
-                    i=i+1;
-                end
-            else
-                converted_dates={};
-            end
-
-            if(~isempty(handles.LeftS))
-                k=1;
-                while(k<=length(handles.LeftS))
-                    convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedLeftS={};
-            end
-
-            if(~isempty(handles.RightS))
-                k=1;
-                while(k<=length(handles.RightS))
-                    convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedRightS={};
-            end
-
-            if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
-                k=1;
-                while(k<=length(handles.startCadTime))
-                    convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
-                    convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
-                    k=k+1;
-                end
-            else
-                convertedStarts={};
-                convertedEnds={};
-            end
-
-            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num, handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS, handles.ind_LeftS]=getTimeDoubles(handles.wkv,convertedStarts,convertedEnds, convertedRightS, convertedLeftS,converted_endMode, converted_dates);
             
-            handles.current_operation='mode';
-            
-            if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
-                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
-            end
-            
-            if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
-            end
-                    
-            if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
-               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
-            end
+            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num,...
+                handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS,...
+                handles.ind_LeftS, handles.left, handles.right, handles.colors, handles.startCadTime,...
+                handles.endCadTime, handles.modes]=processing(handles.textfile, handles.wkv);
+        
         end
-
+        
+        %% After extraction and other processes, represent analysis data
         if(~isempty(handles.toPlotTimes)&& ~isempty(handles.endMode_num))
 
            %need ToPlotTimes and ends_num: Condition
+           %the plot is only done if the timeline representation is active
+           %if cycles or average/variance then only written in analysis
+           %frame but no representation on graph
+           
            if(isequal(get(handles.timebox, 'value'),1))
+                
                 axes(handles.Log_timeline);
-                handles.timeline =plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
+                
+                %make the first time zero
+                initialTime=handles.wkv(end).values(handles.startIndex);
+                %make this initialTime a zero reference:
+                times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+                
+                handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
                 set(handles.timebox,'value',1);
                 hold on
                 ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
@@ -855,14 +890,15 @@ if(isequal(handles.loaded,1))
             ind=1;
             while(ind<=length(handles.toPlotTimes) && ind<=length(handles.endMode_num))
                  if(isequal(get(handles.timebox, 'value'),1))
-                    xval=handles.toPlotTimes(ind);
+                    xval=handles.toPlotTimes(ind)-initialTime;
 
                     axes(handles.Log_timeline);
                     x=[xval,xval];
                     handles.timeline= plot(x,y, handles.colors{1,ind});
 
-                    %second axis
-                    x_analysis=[xval, handles.endMode_num(ind)];
+                    %second axis: on analysis plot 
+                    endplot=handles.endMode_num(ind)-initialTime;
+                    x_analysis=[xval, endplot];
                     axes(handles.analysisAxis);
                     xlim manual;
                     ylim([0,1]);
@@ -909,85 +945,26 @@ function button_Callback(hObject, eventdata, handles)
 % hObject    handle to button (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+%double preventive condition: button not "clickable" if not loaded.
 if(isequal(handles.loaded,1))
     
-    
+        %% Get from txt file all the steps noted in this data
+        
+        %extraction must be done once to get all data. First run takes time
+        %operation of the function getTimeDoubles taking time is to process 
+        %the timestamps dates (wkv(1)) vs. time doubles (wkv(end))
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime,handles.LeftS, handles.RightS]=extraction(handles.textfile);
             handles.extraction=1;
-
-            if(~(isempty(handles.endMode))) 
-                k=1;
-                while(k<=length(handles.endMode))
-                    converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
-                    k=k+1;
-                end
-            else
-                converted_endMode={};
-            end
-
-            if(~isempty(handles.dates))
-                %convert to a wkv timestamp format
-                i=1; 
-                while(i<=length(handles.dates))
-                    converted_dates{1,i}=matTimeConversion(handles.dates{1,i});
-                    i=i+1;
-                end
-            else
-                converted_dates={};
-            end
-
-            if(~isempty(handles.LeftS))
-                k=1;
-                while(k<=length(handles.LeftS))
-                    convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedLeftS={};
-            end
-
-            if(~isempty(handles.RightS))
-                k=1;
-                while(k<=length(handles.RightS))
-                    convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedRightS={};
-            end
-
-            if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
-                k=1;
-                while(k<=length(handles.startCadTime))
-                    %bug: startCadTime longer than endCadTime => see why
-                    convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
-                    convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
-                    k=k+1;
-                end
-            else
-                convertedStarts={};
-                convertedEnds={};
-            end
-
-            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num, handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS, handles.ind_LeftS]   =getTimeDoubles(handles.wkv,convertedStarts,convertedEnds, convertedRightS, convertedLeftS,converted_endMode, converted_dates);
             
-            handles.current_operation='steps';
-            
-            if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
-                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
-            end
-            
-            if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
-            end
-                    
-            if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
-               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
-            end
+            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num,...
+                handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS,...
+                handles.ind_LeftS, handles.left, handles.right, handles.colors, handles.startCadTime,...
+                handles.endCadTime, handles.modes]=processing(handles.textfile, handles.wkv);
         end
 
-
+        %% After extraction and other processes, represent analysis data
+        initialTime=handles.wkv(end).values(handles.startIndex);
         if(~isempty(handles.LeftS_num) && ~isempty(handles.RightS_num))
             k=1; j=1;
             if(isequal(get(handles.timebox, 'value'),1))
@@ -997,7 +974,7 @@ if(isequal(handles.loaded,1))
                    xlim manual;
                    ylim([0,1]);
                    hold on
-                   plot([handles.RightS_num(k),handles.RightS_num(k)],[0.5,0.5], 'ko');
+                   plot([handles.RightS_num(k)-initialTime,handles.RightS_num(k)-initialTime],[0.5,0.5], 'ko');
                    k=k+1;
                 end
 
@@ -1006,7 +983,7 @@ if(isequal(handles.loaded,1))
                    xlim manual;
                    ylim([0,1]);
                    hold on
-                   plot([handles.LeftS_num(j),handles.LeftS_num(j)],[0.5,0.5], 'k*');
+                   plot([handles.LeftS_num(j)-initialTime,handles.LeftS_num(j)-initialTime],[0.5,0.5], 'k*');
                    j=j+1;
                  end
                 hold off;
@@ -1034,88 +1011,28 @@ function cad_button_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% condition needed => only do cadence if doing movement => modes not empty 
+% condition needed => only do cadence if doing movement => modes not empty
 
+%double preventive condition: button not "clickable" if not loaded.
 if(isequal(handles.loaded,1))
     
-
+        %% Get from txt file all the info from txt to calculate cadence
+        
+        %extraction must be done once to get all data. First run takes time
+        %operation of the function getTimeDoubles taking time is to process 
+        %the timestamps dates (wkv(1)) vs. time doubles (wkv(end))
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
+            
             handles.extraction=1;
             
-
-            if(~(isempty(handles.endMode))) 
-                k=1;
-                while(k<=length(handles.endMode))
-                    converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
-                    k=k+1;
-                end
-            else
-                converted_endMode={};
-            end
-
-            if(~isempty(handles.dates))
-                %convert to a wkv timestamp format
-                i=1; 
-                while(i<=length(handles.dates))
-                    converted_dates{1,i}=matTimeConversion(handles.dates{1,i});
-                    i=i+1;
-                end
-            else
-                converted_dates={};
-            end
-
-            if(~isempty(handles.LeftS))
-                k=1;
-                while(k<=length(handles.LeftS))
-                    convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedLeftS={};
-            end
-
-            if(~isempty(handles.RightS))
-                k=1;
-                while(k<=length(handles.RightS))
-                    convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedRightS={};
-            end
-
-            if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
-                k=1;
-                while(k<=length(handles.startCadTime))
-                    convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
-                    convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
-                    k=k+1;
-                end
-            else
-                convertedStarts={};
-                convertedEnds={};
-            end
-
-            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num, handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS, handles.ind_LeftS]=getTimeDoubles(handles.wkv,convertedStarts,convertedEnds, convertedRightS, convertedLeftS,converted_endMode, converted_dates);
-            
-            handles.current_operation='cad';
-            
-            if((isempty(handles.dates) || (isequal(handles.endMode, ' '))) && isequal(handles.current_operation,'mode'))
-                 f = msgbox({'Your selection does not comprise enough input to identify the modes: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Mode Functionality Unoperational.'); 
-            end
-            
-            if(isempty(handles.RightS) && isempty(handles.LeftS) && isequal(handles.current_operation,'steps'))
-                f = msgbox({'Your selection does not comprise any steps: consider looking at a broader selection.'; 'Suggestion: analyse the whole data set to make an appropriate selection.'},'Steps Functionality Unoperational.');       
-            end
-                    
-            if(((isequal(handles.startCadTime, ' ')) || (isequal(handles.endCadTime, ' '))) && isequal(handles.current_operation,'cad'))
-               f = msgbox({'Your selection does not comprise enough input to calculate the cadence: consider looking at a broader selection.' ;'Suggestion: analyse the whole data set to make an appropriate selection.'},'Cadence Functionality Unoperational.');            
-            end
-            
+            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num,...
+                handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS,...
+                handles.ind_LeftS, handles.left, handles.right, handles.colors, handles.startCadTime,...
+                handles.endCadTime, handles.modes] = processing(handles.textfile, handles.wkv);
+    
         end
         
-
+        %% After extraction and other processes, represent analysis data
         if(~isempty(handles.starts_num) && ~isempty(handles.ends_num))
             total=handles.left+handles.right+0.5; %+0.5 step
             
@@ -1142,124 +1059,87 @@ guidata(hObject, handles);
 
 % --- Executes on button press in timebox.
 function timebox_Callback(hObject, eventdata, handles)
-% hObject    handle to timebox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+
 if(isequal(handles.loaded,1))
+    %% Time Representation
     if(isequal(get(handles.timebox,'value'),1))
         %Replot the timeline for variable choice
+        set(handles.allbox, 'Enable','on');
         set(handles.allbox, 'value', 0);
         set(handles.avbox, 'value',0);
+        set(handles.select_button, 'Enable', 'on');
 
         axes(handles.Log_timeline);
         hold off;
-        plot(handles.wkv(end).values(handles.startIndex:end), handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        %make the first time zero
+        initialTime=handles.wkv(end).values(handles.startIndex);
+        %make this initialTime a zero reference:
+        times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+        plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
     end
 end
 
 guidata(hObject, handles);
 
-% Hint: get(hObject,'Value') returns toggle state of timebox
-
 
 % --- Executes on button press in allbox.
 function allbox_Callback(hObject, eventdata, handles)
-% hObject    handle to allbox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
-%value = get(h.checkbox1, 'Value');
-set(handles.timebox, 'value',0);
+%% All Cycle Representation
+
+%double preventive condition: button not "clickable" if not loaded.
 if(isequal(handles.loaded,1))
+    
     %two possibilities: if there are steps then take the time between steps
     %as cycles and take out first because don't know where it begins
     %if there is startCadTime and steps then can have first step included
 
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
+    
             handles.extraction=1;
             
-
-            if(~(isempty(handles.endMode))) 
-                k=1;
-                while(k<=length(handles.endMode))
-                    converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
-                    k=k+1;
-                end
-            else
-                converted_endMode={};
-            end
-
-            if(~isempty(handles.dates))
-                %convert to a wkv timestamp format
-                i=1; 
-                while(i<=length(handles.dates))
-                    converted_dates{1,i}=matTimeConversion(handles.dates{1,i});
-                    i=i+1;
-                end
-            else
-                converted_dates={};
-            end
-
-            if(~isempty(handles.LeftS))
-                k=1;
-                while(k<=length(handles.LeftS))
-                    convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedLeftS={};
-            end
-
-            if(~isempty(handles.RightS))
-                k=1;
-                while(k<=length(handles.RightS))
-                    convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedRightS={};
-            end
-
-            if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
-                k=1;
-                while(k<=length(handles.startCadTime))
-                    convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
-                    convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
-                    k=k+1;
-                end
-            else
-                convertedStarts={};
-                convertedEnds={};
-            end
-
-            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num, handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS, handles.ind_LeftS]=getTimeDoubles(handles.wkv,convertedStarts,convertedEnds, convertedRightS, convertedLeftS,converted_endMode, converted_dates);
-
+            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num,...
+                handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS,...
+                handles.ind_LeftS, handles.left, handles.right, handles.colors, handles.startCadTime,...
+                handles.endCadTime, handles.modes] = processing(handles.textfile, handles.wkv);
+    
         end
         
         %if condition makes that we can only look at one mode/zone after another
         if(isempty(handles.ind_PlotTimes) || isequal(length(handles.ind_PlotTimes),1))
+            %% Representation boxes switch
+            set(handles.timebox, 'value',0);
+            set(handles.timebox, 'Enable','on');
+            set(handles.allbox, 'Enable','off');
+            set(handles.select_button, 'Enable', 'off');
+            %% Adapt the step data so as to always have full 2 step cycle based on the left leg foot off
+            if(handles.ind_RightS(1)>handles.ind_LeftS(1))
+                %take away the end of this first left step time so that the
+                %cycle pattern is defined by the end of a right step always
+                %this means we are looking at the left leg as a reference
+                handles.ind_LeftS=handles.ind_LeftS(2:end);
+            end
+            
+            %Check that right step time +1 superior than left step time 
+            %else take away last left step time because would leave half a cycle
+            if(length(handles.ind_RightS)<length(handles.ind_LeftS))
+                handles.ind_LeftS=handles.ind_LeftS(1:end-1);
+            end
             
             indices=transpose(sort([handles.ind_RightS handles.ind_LeftS]));
-            %wkv_split will do: indices=(2:end); take away first ending step because we do not know where it starts
-
-            if(~isequal(handles.all,1))
+            N=length(handles.ind_RightS)-1;
+            
+            if(~isequal(handles.all,1) && isequal(get(handles.allbox,'value'),1) && ~isequal(handles.varIndex,'-'))
                 handles.all=1;
                 % 1 get cycles
-                handles.cycles = wkv_split_cycles_from_txt(handles.wkv, 'controller/right_motorboard/joint_angle_a_knee',indices);
-                
-                %Test for cycles - remove from final code
-                %cycleTest=handles.cycles;
-                %save('cycleTest.mat', 'cycleTest');
-                
-                % 2 use get to obtain index of the variable of each cycle that is to be
-                % plotted when cycles stacked
-                %[~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
-                %i.e. the handles.val => adapt in variableChoice_Callback
+                handles.cycles = wkv_split_cycles_from_txt(handles.wkv,indices,N);
 
-                % 3 stack cycles
+                % 2 stack cycles
                 nPoints=300*length(handles.cycles);
                 [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
+                %transform into a percentage time scale
+                handles.times= (100.*handles.times)./handles.times(end);
+                
                 %% Check the function arguments.
                 if ~isvector(handles.times)
                     error('times should be a vector.');
@@ -1272,39 +1152,47 @@ if(isequal(handles.loaded,1))
             end
 
 
-           if(isequal(get(handles.allbox,'value'),1))
+           if(isequal(get(handles.allbox,'value'),1) && ~isequal(handles.varIndex,'-'))
 
             %% Plot.
-            % All the curves.
+            % All the curves and add a legend indicating which cycle is which
+            
+            %clear analysis axis
+            axes(handles.analysisAxis);
+            children = get(gca, 'children');
+            delete(children);
+            
             axes(handles.Log_timeline);
             plot(handles.times, handles.stackedCycles);
-            
+            xlabel('Cycle (2 steps) Percentage');
             [num, ~]=size(handles.stackedCycles);
-            i=1; %labels=zeros(num,1);
+            i=1; 
             while(i<=num)
                 labels{i}=strcat('Cycle ' , num2str(i));
                 i=i+1;
             end
-            legend(labels, 'Location', 'southeast');
+            legend(labels, 'Location', 'northeast');
             
             hold on
             
            end
-
+        else
+            %% Representation boxes maintained
+            set(handles.timebox, 'Enable','on');
+            set(handles.timebox, 'value',1);
+            set(handles.allbox, 'Enable','on');
+            set(handles.allbox, 'value',0);
+            f = msgbox({'Cycle decomposition can only be done for one mode.'; ...
+                'Please select your data before visualizing cycles.'}, ...
+                'Cycle Requirement' );
         end 
 end
 guidata(hObject, handles);
 
 
-% Hint: get(hObject,'Value') returns toggle state of allbox
-
-
 % --- Executes on button press in avbox.
 function avbox_Callback(hObject, eventdata, handles)
-% hObject    handle to avbox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-set(handles.timebox, 'value',0);
+%% Average and Variance Representation of Cycles 
 
 if(isequal(handles.loaded,1))
     %two possibilities: if there are steps then take the time between steps
@@ -1312,92 +1200,49 @@ if(isequal(handles.loaded,1))
     %if there is startCadTime and steps then can have first step included
 
         if(isequal(handles.extraction,0))
-            [handles.dates, handles.modes, handles.colors,handles.endMode, handles.left,handles.right,handles.startCadTime,handles.endCadTime, handles.LeftS, handles.RightS]=extraction(handles.textfile);
+                
             handles.extraction=1;
             
-
-            if(~(isempty(handles.endMode))) 
-                k=1;
-                while(k<=length(handles.endMode))
-                    converted_endMode{1,k}=matTimeConversion(handles.endMode{1,k});
-                    k=k+1;
-                end
-            else
-                converted_endMode={};
-            end
-
-            if(~isempty(handles.dates))
-                %convert to a wkv timestamp format
-                i=1; 
-                while(i<=length(handles.dates))
-                    converted_dates{1,i}=matTimeConversion(handles.dates{1,i});
-                    i=i+1;
-                end
-            else
-                converted_dates={};
-            end
-
-            if(~isempty(handles.LeftS))
-                k=1;
-                while(k<=length(handles.LeftS))
-                    convertedLeftS{1,k}=matTimeConversion(handles.LeftS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedLeftS={};
-            end
-
-            if(~isempty(handles.RightS))
-                k=1;
-                while(k<=length(handles.RightS))
-                    convertedRightS{1,k}=matTimeConversion(handles.RightS{1,k});
-                    k=k+1;
-                end
-            else
-                convertedRightS={};
-            end
-
-            if(~(isequal(handles.startCadTime, ' ')) && ~(isequal(handles.endCadTime, ' ')))
-                k=1;
-                while(k<=length(handles.startCadTime))
-                    convertedStarts{1,k}=matTimeConversion(handles.startCadTime{1,k});
-                    convertedEnds{1,k}=matTimeConversion(handles.endCadTime{1,k});
-                    k=k+1;
-                end
-            else
-                convertedStarts={};
-                convertedEnds={};
-            end
-
-            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num, handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS, handles.ind_LeftS]=getTimeDoubles(handles.wkv,convertedStarts,convertedEnds, convertedRightS, convertedLeftS,converted_endMode, converted_dates);
-
+            [handles.starts_num, handles.ends_num, handles.RightS_num, handles.LeftS_num,...
+                handles.endMode_num,handles.toPlotTimes, handles.ind_PlotTimes, handles.ind_RightS,...
+                handles.ind_LeftS, handles.left, handles.right, handles.colors, handles.startCadTime,...
+                handles.endCadTime, handles.modes] = processing(handles.textfile, handles.wkv);
+    
         end
         
         %if condition makes that we can only look at one mode/zone after another
         if(isempty(handles.ind_PlotTimes) || isequal(length(handles.ind_PlotTimes),1))
+            %% Representation boxes switch
+            set(handles.timebox, 'value',0);
+            set(handles.timebox, 'Enable','on');
+            set(handles.allbox, 'Enable','off');
+            set(handles.select_button, 'Enable', 'off');
+            %% Adapt the step data so as to always have full 2 step cycle based on the left leg foot off
+            if(handles.ind_RightS(1)>handles.ind_LeftS(1))
+                %take away the end of this first left step time so that the
+                %cycle pattern is defined by the end of a right step always
+                %this means we are looking at the left leg as a reference
+                handles.ind_LeftS=handles.ind_LeftS(2:end);
+            end
+            
+            %Check that right step time +1 superior than left step time 
+            %else take away last left step time because would leave half a cycle
+            if(length(handles.ind_RightS)<length(handles.ind_LeftS))
+                handles.ind_LeftS=handles.ind_LeftS(1:end-1);
+            end
             
             indices=transpose(sort([handles.ind_RightS handles.ind_LeftS]));
-            %wkv_split will do: indices=(2:end); take away first ending step because we do not know where it starts
-
-            if(~isequal(handles.all,1) && ~isequal(handles.varIndex,'-'))
+            N=length(handles.ind_RightS)-1;
+            
+            if(~isequal(handles.all,1) && isequal(get(handles.avbox,'value'),1) && ~isequal(handles.varIndex,'-') )
                 handles.all=1;
                 % 1 get cycles
-                %take away splittingVar, not useful
-                handles.cycles = wkv_split_cycles_from_txt(handles.wkv, 'controller/right_motorboard/joint_angle_a_knee',indices);
-                
-                %Testing code:
-                cycleTest=handles.cycles;
-                save('cycleTest.mat', 'cycleTest');
-                
-                % 2 use get to obtain index of the variable of each cycle that is to be
-                % plotted when cycles stacked
-                %[~, varIndex] = wkv_get(handles.cycles{1,1}, 'controller/left_motorboard/joint_angle_a_knee');
-                %i.e. the handles.val => adapt in variableChoice_Callback
-
-                % 3 stack cycles
-                
+                handles.cycles = wkv_split_cycles_from_txt(handles.wkv,indices,N);
+                % 2 stack cycles
                 nPoints=300*length(handles.cycles);
                 [handles.stackedCycles, handles.times] = wkv_stack_cycles(handles.cycles, handles.varIndex, nPoints);
+                %transform into a percentage time scale
+                handles.times= (100.*handles.times)./handles.times(end);
                 %% Check the function arguments.
                 if ~isvector(handles.times)
                     error('times should be a vector.');
@@ -1410,6 +1255,10 @@ if(isequal(handles.loaded,1))
             end
 
             if(isequal(get(handles.avbox,'value'),1) && ~isequal(handles.varIndex,'-'))
+                 %clear analysis axis
+                axes(handles.analysisAxis);
+                children = get(gca, 'children');
+                delete(children);
                 %% Constants.
                 FILL_COLOR = [1 1 1] * 0.8; % Light gray.
 
@@ -1419,18 +1268,22 @@ if(isequal(handles.loaded,1))
                 mstdp = m + standardDeviation;
                 mstdm = m - standardDeviation;
 
-
                 %% Plot.
                 % Mean and standard deviation envelope.
                 axes(handles.Log_timeline);
+                xlabel('Cycle (2 steps) Percentage');
                 fill([handles.times fliplr(handles.times)], [mstdm fliplr(mstdp)], ...
                      FILL_COLOR, 'EdgeColor','None');
                 hold on;
                 plot(handles.times, m, 'black', 'LineWidth', 2);
-                
-                
+                        
             end
         else
+            %% Representation boxes maintained
+            set(handles.timebox, 'Enable','on');
+            set(handles.timebox, 'value',1);
+            set(handles.allbox, 'Enable','on');
+            set(handles.allbox, 'value',0);
             f = msgbox({'Cycle decomposition can only be done for one mode.'; ...
                 'Please select your data before visualizing cycles.'}, ...
                 'Cycle Requirement' );
@@ -1438,15 +1291,14 @@ if(isequal(handles.loaded,1))
 end
 guidata(hObject, handles);
 
-% Hint: get(hObject,'Value') returns toggle state of avbox
-
 
 % --- Executes on button press in videoImportbutton.
 function videoImportbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to videoImportbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-set(handles.exitbutton,'Enable','off');
+
+%% Import Video
 
 [ video_file_name,video_file_path ] = uigetfile({'*.mp4'},'Pick a video file');   
 if(video_file_path == 0)
@@ -1463,12 +1315,19 @@ set(handles.scroll,'Min',0);
 set(handles.scroll,'Max',handles.videoObject.Duration);
 
 handles.videoObject = VideoReader(handles.input_video_file);
-%frame_1 = readFrame(handles.videoObject);
 frame_1=read(handles.videoObject,1);
 axes(handles.videoaxes);
 imshow(frame_1);
 drawnow;
 axis(handles.videoaxes,'off');
+
+%% Set button properties
+set(handles.exitbutton,'Enable','off');
+set(handles.playbutton, 'Enable', 'on');
+set(handles.forwardbutton,'Enable','on');
+set(handles.backbutton,'Enable','on');
+set(handles.vidMbutton,'Enable','on');
+set(handles.scroll, 'Enable', 'on');
 
 
 guidata(hObject, handles);
@@ -1481,37 +1340,63 @@ function playbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 % Display first frame
 %set(handles.pausebutton,'Enable','on');
+
+%% Play/Pause - show marked frame
+
 set(handles.videoImportbutton,'Enable','off');
 
 if(strcmp(get(handles.playbutton,'String'),'Play'))
+    %% Play has been clicked
     set(handles.playbutton,'String','Pause');
+    
     set(handles.forwardbutton,'Enable','off');
     set(handles.backbutton,'Enable','off');
     set(handles.vidMbutton,'Enable','off');
+    set(handles.timMbutton,'Enable','off');
     set(handles.scroll, 'Enable', 'off');
+    
+    set(handles.avbox, 'Enable', 'off');
+    set(handles.allbox, 'Enable', 'off');
+    set(handles.timebox, 'Enable', 'off');
+    set(handles.cad_button, 'Enable', 'off');
+    set(handles.button, 'Enable', 'off');
+    set(handles.mode_button, 'Enable', 'off');
+    set(handles.save_button, 'Enable', 'off');
+    set(handles.select_button, 'Enable', 'off');
+    set(handles.playload, 'Enable', 'off');
     
     handles.user_quit=0;
     guidata(hObject, handles);
 
 else
+    %% Pause has been clicked
     set(handles.playbutton,'String','Play');
+    
     set(handles.forwardbutton,'Enable','on');
     set(handles.backbutton,'Enable','on');
     set(handles.vidMbutton,'Enable','on');
+    set(handles.timMbutton,'Enable','on');
     set(handles.scroll, 'Enable', 'on');
-    handles.user_quit=1;
-    guidata(hObject, handles);
     set(handles.exitbutton,'Enable','on');
     
+    handles.user_quit=1;
+    guidata(hObject, handles);
+        
 end
 
-axes(handles.videoaxes);
+%timeline 
+ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+y=[ymin,ymax]; %height of the curves
 
 for i=handles.f:handles.totalframes
+    axes(handles.videoaxes);
+    
     handles = guidata(hObject);
-    disp(handles.user_quit);
+    
     if(~handles.user_quit)
-
+        
+        %update frame count and update scroll position
         handles.f=i;
         guidata(hObject, handles);
         handles = guidata(hObject);
@@ -1519,16 +1404,40 @@ for i=handles.f:handles.totalframes
         guidata(hObject, handles);
         handles = guidata(hObject);
         
+        %if the frame is the marked frame, display marked frame 
         if(isequal(i,handles.markedFnum))
             imshow(handles.markedFrame);
             drawnow;
             pause(0.02);
         else
-        handles.frame = read(handles.videoObject,i);
-        guidata(hObject, handles);
-        imshow(handles.frame);
-        drawnow;
-        pause(0.07); 
+            %display frames one after the other
+            handles.frame = read(handles.videoObject,i);
+            guidata(hObject, handles);
+            imshow(handles.frame);
+            drawnow;
+            pause(0.095); 
+
+            %timeline. 
+            %sync must be activated and frames played must be after the marked frame
+            if(~isequal(handles.sync,0) && (i>handles.markedFnum)) 
+                %old position of marker
+                oldx=handles.xmarker;
+                %the video advances. 
+                %the reference time is that of the marker frame: handles.markedTime
+                %moves time marker forwards the number of seconds that the video moves forwards
+                videoadvancement=handles.videoObject.CurrentTime-handles.markedTime;
+                %calculate new position
+                axes(handles.Log_timeline);
+                hold on;
+                %delete the timeline marker each time moved forward
+                children = get(gca, 'children');
+                delete(children(1));
+                handles.xmarker=oldx+videoadvancement;
+                x=[handles.xmarker,handles.xmarker];
+                handles.new= plot(x,y, ':r', 'Linewidth', 2);
+                hold off;
+            end
+   
         end
             
     else
@@ -1543,12 +1452,21 @@ function forwardbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to forwardbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+%% Forward Button
 axes(handles.videoaxes);
-%handles.videoObject = VideoReader(handles.input_video_file);
-handles = guidata(hObject);
-handles.frame=read(handles.videoObject,(handles.f+1));
-handles.f=(handles.f+1);
-imshow(handles.frame); 
+if(isequal(handles.f+1,handles.markedFnum))
+    imshow(handles.markedFrame);
+    drawnow;
+    pause(0.02);
+else
+    handles = guidata(hObject);
+    handles.frame=read(handles.videoObject,(handles.f+1));
+    handles.f=(handles.f+1);
+    imshow(handles.frame); 
+end
+
+%add the display of markedFrame
 guidata(hObject, handles);
 
 
@@ -1558,21 +1476,29 @@ function backbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to backbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+%% Backward Button
 axes(handles.videoaxes);
-
-handles = guidata(hObject);
-handles.frame=read(handles.videoObject,(handles.f-1));
-handles.f=(handles.f-1);
-imshow(handles.frame);
-drawnow; 
+if(isequal(handles.f-1,handles.markedFnum))
+    imshow(handles.markedFrame);
+    drawnow;
+    pause(0.02);
+else
+    handles = guidata(hObject);
+    handles.frame=read(handles.videoObject,(handles.f-1));
+    handles.f=(handles.f-1);
+    imshow(handles.frame);
+    drawnow; 
+end
 
 guidata(hObject, handles);
+
 
 function scroll_Callback(hObject, eventdata, handles)
 % hObject    handle to scroll (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+%% Scroll movement 
+axes(handles.videoaxes);
 handles = guidata(hObject);
 
 %old time
@@ -1584,10 +1510,17 @@ diff=newTime-oldTime;
 numofFrames=floor((diff)*handles.fps);
 handles.f=handles.f+numofFrames;
 
-handles.frame=read(handles.videoObject,handles.f);
-imshow(handles.frame);
-drawnow; 
+if(isequal(handles.f,handles.markedFnum))
+    imshow(handles.markedFrame);
+    drawnow;
+    pause(0.02);
+else
+    handles.frame=read(handles.videoObject,handles.f);
+    imshow(handles.frame);
+    drawnow; 
+end
     
+%add the display of markedFrame
 guidata(hObject, handles);
 
 
@@ -1603,28 +1536,32 @@ if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColo
 end
 
 
-
-
 % --- Executes on button press in vidMbutton.
 function vidMbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to vidMbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+%% Place video marker by making a new marked frame image
 %its role: memorize the currentTime at hand and the frame number
 %show visually the marker
-set(handles.timMbutton,'Enable','on');
-%sync condition?
-set(handles.syncbutton,'Enable','on');
 
+axes(handles.videoaxes);
 handles = guidata(hObject);
 handles.markedTime=handles.videoObject.CurrentTime;
 handles.markedFnum=handles.f;
 %result of insertMarker is an image
 handles.markedFrame=insertShape(handles.frame,'circle',[80 130 35],'LineWidth',20);
-%handles.markedFrame=insertMarker(handles.frame,[147 279], 'o', 'color', 'red','size', 100);
 imshow(handles.markedFrame);
 drawnow;
+pause(0.2);
+
+set(handles.timMbutton,'Enable','on');
+%both video and timeline markers are set so sync is possible
+if(~isequal(handles.timemarker,0))
+    set(handles.syncbutton,'Enable','on');
+end
+
 guidata(hObject, handles);
 
 
@@ -1634,6 +1571,29 @@ function timMbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to timMbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+%% Place marker on timeline 
+%ginput
+axes(handles.Log_timeline);
+[handles.xmarker,~] = ginput(1)
+%create a vertical red bar as a "cursor"
+
+ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+y=[ymin,ymax]; %height of the curves
+
+hold on;
+x=[handles.xmarker,handles.xmarker];
+handles.new= plot(x,y, ':r', 'Linewidth', 2);
+hold off;
+
+handles.timemarker=1;
+
+%both video and timeline markers are set so sync is possible
+if(~isequal(handles.markedFnum,0))
+    set(handles.syncbutton,'Enable','on');
+end
+
+guidata(hObject, handles);
 
 
 % --- Executes on button press in syncbutton.
@@ -1641,18 +1601,11 @@ function syncbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to syncbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-
-% --- Executes on slider movement.
-
-
-
-% --- Executes on button press in exitbutton.
-function exitbutton_Callback(hObject, eventdata, handles)
-% hObject    handle to exitbutton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-delete(handles.figure1);
+%% sync the video and timeline markers only if they have been created
+if(~isequal(handles.timemarker,0) && ~isequal(handles.markedFnum,0))
+    handles.sync=1;
+end
+guidata(hObject, handles);
 
 
 % --- Executes on button press in playload.
@@ -1663,8 +1616,8 @@ function playload_Callback(hObject, eventdata, handles)
 %call function to get values and index => wkv_get must be in the same
 %folder as the GUI Preview
 
-%Elaboration idea: have an average per second? 
-%
+
+%% Represent Load Data from wkv
 i=handles.loadindex;
 if(isequal(handles.loaded,1))
     if(~exist('wkv_get.m', 'file'))
@@ -1685,6 +1638,7 @@ if(isequal(handles.loaded,1))
 
         end
         
+        %% Call loadProcess function to cut into seconds
         handles = guidata(hObject);
         if(~isequal(handles.cutpersec,1))
             [handles.loadpersec,handles.stamps]=loadProcess(handles.wkv);
@@ -1696,6 +1650,7 @@ if(isequal(handles.loaded,1))
             handles = guidata(hObject);
             if(~handles.user_quit)
                 
+                %% Affect the load per second for representation
                 aL=handles.loadpersec(i,1); bL=handles.loadpersec(i,2); cL=handles.loadpersec(i,3); dL=handles.loadpersec(i,4);
                 Row2L=[cL dL]; Row1L=[aL bL];
                 cdataL=[Row1L;Row2L]
@@ -1703,7 +1658,8 @@ if(isequal(handles.loaded,1))
                 aR=handles.loadpersec(i,5); bR=handles.loadpersec(i,6); cR=handles.loadpersec(i,7); dR=handles.loadpersec(i,8);
                 Row2R=[cR dR]; Row1R=[aR bR];
                 cdataR=[Row1R;Row2R]
-
+                
+                %% Draw left Load cells
                 handles = guidata(hObject);
                 if(~handles.user_quit)
                 axes(handles.leftloadcell);
@@ -1712,7 +1668,7 @@ if(isequal(handles.loaded,1))
                 axis(handles.leftloadcell,'off');
                 drawnow;
                 end
-                
+                %% Draw right Load cells
                 handles = guidata(hObject);
                 if(~handles.user_quit)
                 axes(handles.rightloadcell);
@@ -1721,7 +1677,7 @@ if(isequal(handles.loaded,1))
                 axis(handles.rightloadcell,'off');
                 drawnow;
                 end
-                
+                %% Indicate the second time frame associated 
                 handles = guidata(hObject);
                 if(~handles.user_quit)
                 set(handles.loadtime, 'String', datestr(handles.stamps(i)));
@@ -1746,3 +1702,11 @@ if(isequal(handles.loaded,1))
     end
 end
 guidata(hObject, handles);
+
+% --- Executes on button press in exitbutton.
+function exitbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to exitbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%% EXIT
+delete(handles.figure1);

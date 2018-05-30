@@ -1,4 +1,4 @@
-function cycles = wkv_split_cycles_from_txt(wkv, splittingVar, indices)
+function cycles = wkv_split_cycles_from_txt(wkv, indices, N)
 %WKV_SPLIT_CYCLES_ Splits into sub-wkvs with a single cycle.
 %   Splits the given wkv into individual cycles. The method is to strongly
 %   filter the values corresponding to the splittingVar index, such that
@@ -6,38 +6,22 @@ function cycles = wkv_split_cycles_from_txt(wkv, splittingVar, indices)
 %   this curve is crossing zero from a negative to a positive value.
 %   The found cutting points can be shift by the phaseOffset [%].
 
-%%
-if ~exist('smoothing', 'var')
-    smoothing = 500;
-end
-
-if ischar(splittingVar)
-    traj = wkv_get(wkv, splittingVar);
-else
-    traj = wkv(splittingVar).values;
-end
-
 %% Detect the cycles.
-
-% Apply strong filtering to obtain a centered sine wave.
-trajSmooth = smooth(traj, smoothing); % Low-pass filter.
-trajSmooth = trajSmooth - smooth(traj, smoothing*2); % High-pass filter.
-
-%
-%indices would be: double startCadTime (i.e. first half step) and then all
-%steps following => take 
-%zc = diff(trajSmooth > 0) > 0;
-%indices = find(zc);
-indices = indices(2:end-1); % Remove the first and last cycles, that are likely incomplete.
-
-N = length(indices)-1;
 
 cycles = cell(N,1);
 
-for i=1:length(cycles)
-    cycleIndexDuration = indices(i+1) - indices(i);
-    %phaseIndexOffset = floor(phaseOffset/100 * cycleIndexDuration);
-    cycles{i} = wkv_subset(wkv, (indices(i):indices(i+1)));
+i=1; j=1;
+while (i<length(indices))
+
+    %the last indice is the one that defines if the step is a left or right
+    %step. Indeed the indices indicate the END of a step
+    
+    %End right step time + end left step time = 1 LEFT step
+    %same end left step time + end right step time = 1 RIGHT step
+    %3 indices represent two steps and a full cycle
+    cycles{j} = wkv_subset(wkv, (indices(i):indices(i+2)));
+    i=i+2;
+    j=j+1;
 end
 
 end
