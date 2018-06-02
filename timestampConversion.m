@@ -1,4 +1,11 @@
 function [txt_equiv, day, hour, min, secs] = timestampConversion(mat_time)
+
+%TIMESTAMPCONVERSION 
+%   converts a datetime value coming from the wkv data into its text file date format.
+%   input date (from wkv): 25-Sep-2017 06:42:24 
+%   output date format (from txt file): [2017-09-25_06_42_24]
+
+
 mat_time=datestr(mat_time); %incoming data is a datetime object not string so conversion is necessary
 str_elements = strsplit(mat_time,' '); %seperate date from time
 

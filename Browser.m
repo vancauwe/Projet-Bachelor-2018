@@ -1,29 +1,42 @@
 function varargout = Browser(varargin)
 % BROWSER MATLAB code for Browser.fig
-%      BROWSER, by itself, creates a new BROWSER or raises the existing
-%      singleton*.
+%    The Browser allows to:
+%    - open files one by one in Preview for analysis 
+%    - regroup files into albums
 %
-%      H = BROWSER returns the handle to a new BROWSER or the handle to
-%      the existing singleton*.
+%    Browser_OpeningFc: [line 61]
+%    disables certain buttons by default
 %
-%      BROWSER('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in BROWSER.M with the given input arguments.
+%%   Loading
+%    addbutton_Callback: [line 124]
+%    interactively add files to the filelist. Enables
+%    the disabled buttons.
+%    
+%    importbutton_Callback: [line 273]
+%    allows to import an entire album to the fileliste.
+%    (reads the text file to get all the reference pathes of the files in
+%    the album)
+%%   Other functions   
+%    deletebutton_Callback: [line 160]
+%    deletes the selected file from file list
 %
-%      BROWSER('Property','Value',...) creates a new BROWSER or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before Browser_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to Browser_OpeningFcn via varargin.
+%    previewbutton_Callback: [line 185]
+%    opens up preview for the single file selected
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
+%%   Albums
+%    makebutton_Callback: [line 254]
+%    displays message explaining how to make an album
 %
-% See also: GUIDE, GUIDATA, GUIHANDLES
-
-% Edit the above text to modify the response to help Browser
+%    albumbutton_Callback: [line 208]
+%    creates an ablum in the form of a text file with the references
+%    (pathes) of all the files composing the album
+%
+%%   Required External Functions and GUI
+%    Preview.m / Preview.fig
 
 % Last Modified by GUIDE v2.5 09-May-2018 17:37:30
 
+%% Opening Code
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
@@ -54,7 +67,10 @@ function Browser_OpeningFcn(hObject, eventdata, handles, varargin)
 
 % Choose default command line output for Browser
 handles.output = hObject;
-
+set(handles.deletebutton,'Enable','off');
+set(handles.previewbutton,'Enable','off');
+set(handles.albumbutton, 'Enable', 'off');
+set(handles.makebutton, 'Enable', 'off');
 % Update handles structure
 guidata(hObject, handles);
 
@@ -126,6 +142,11 @@ try
       end
 
       set(handles.filelist, 'String', handles.Files);
+      
+      set(handles.deletebutton,'Enable','on');
+      set(handles.previewbutton,'Enable','on');
+      set(handles.albumbutton, 'Enable', 'on');
+      set(handles.makebutton, 'Enable', 'on');
             
 catch 
     errordlg(['There was a problem loading the files.'],'Load Error!');
@@ -182,11 +203,6 @@ else
 end
 guidata(hObject, handles);
 
-%will have to put in OpeningFcn that access Browser data and uses the
-%filelist value and string to load automatically the file into the preview
-
-
-
 
 % --- Executes on button press in albumbutton.
 function albumbutton_Callback(hObject, eventdata, handles)
@@ -201,7 +217,6 @@ num_lines=1;
 answer=inputdlg(prompt,dlg_title,num_lines);
 %indicate path: uigetdir
 selpath = uigetdir;
-disp(selpath);
 %make it: mkdir
 try
     newFolder=fullfile(selpath,answer{1});
@@ -222,42 +237,18 @@ try
     Filenames = get(handles.filelist,'String');
     i=1;
     while( i<=length(albumIndexes))
-
-       %Duplicates files
-       %fileToLoad=Filenames{albumIndexes(i)};
-       %[~,name,~]=fileparts(fileToLoad);
-       %newPlace=fullfile(newFolder,name);
-       %fileToSave=load(fileToLoad);
-       %save(newPlace, 'fileToSave');
-
        fileNameToSave=Filenames{albumIndexes(i)};
        fprintf(fileID,'%s\n', fileNameToSave);
        i=i+1;        
     end
     fclose(fileID);
-    % handles.textfile=importdata(filename, '\t');
 catch
     errordlg(['New Album folder could not be created.'],'Album Creation Error!');
     return;
 end
-%iterate through selection
 
 
 guidata(hObject, handles);
-
-
-% with multi selection then get indexes as a tableau
-% ask to create album folder and name
-% load files one by one into workspace 
-% save in this folder specified
-% close one by one after saving 
-
-%Note: when press on make file then multi select is on. Must have a
-%condition for preview button to avoid bug
-
-
-
-
 
 % --- Executes on button press in makebutton.
 function makebutton_Callback(hObject, eventdata, handles)
@@ -302,6 +293,11 @@ try
       end
       
       set(handles.filelist, 'String', handles.Files);
+      
+      set(handles.deletebutton,'Enable','on');
+      set(handles.previewbutton,'Enable','on');
+      set(handles.albumbutton, 'Enable', 'on');
+      set(handles.makebutton, 'Enable', 'on');
 catch
 end
 

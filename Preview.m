@@ -1,29 +1,129 @@
 function varargout = Preview(varargin)
 % PREVIEW MATLAB code for Preview.fig
-%      PREVIEW, by itself, creates a new PREVIEW or raises the existing
-%      singleton*.
+%    The Preview allows to:
+%    - plot wkv variables vs time
+%    - plot for a single mode the cycles and cycles'average and variance
+%    - from text file extraction, inform on the modes occuring, the number
+%    of steps and the cadence per movement zone
+%    - import and mark a video so as to synchronize video playing and a
+%    marker on the plotted timeline
+%    - display the load cells'data on both feet per second
+%    - select and crop wkv & text file (irreversible)
+%    - save analysis and new files if created
 %
-%      H = PREVIEW returns the handle to a new PREVIEW or the handle to
-%      the existing singleton*.
+%    Preview_OpeningFcn: [line 126]
+%    disables certain buttons by default and initializes booleans.
 %
-%      PREVIEW('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in PREVIEW.M with the given input arguments.
+%%   Representations
 %
-%      PREVIEW('Property','Value',...) creates a new PREVIEW or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before Preview_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to Preview_OpeningFcn via varargin.
+%    timeline_button_Callback: [line 236]
+%    gets file reference path from Browser. 
+%    Interactively asks user to select the wkv if there are multiple ones in the log. 
+%    Loads the wkv data and the associated text file.
+%    Enables the disabled buttons.
+%    
+%    variableChoice_Callback: [line 798]
+%    from dropdown menu, changes the time or cycles representation
+%    depending on the wkv variable selected
+%    
+%    allbox_Callback: [line 1179]
+%    calls effector function wkv_split_cycles_from_txt.m so as to create cycles and plot them
+%    
+%    avbox_Callback: [line 1289]
+%    calls effector function wkv_split_cycles_from_txt.m so as to create
+%    cycles. Averages them plots average and variance of the cycles.   
 %
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
+%    timebox_Callback: [line 1155]
+%    represents data vs time
 %
-% See also: GUIDE, GUIDATA, GUIHANDLES
+%%   Select
+%    selectbutton_Callback: [line 400]
+%    through interactive cursor, cuts the wkv data and the text file
+%    accordingly. Calls dateSkippedChecked
+%%   Analysis Panel 
+%
+%    mode_button_Callback: [line 939]
+%    calls effector function processing.m to display the modes on the
+%    Analysis Panel and -only if the representation active is the time representation-
+%    plot them with their respective colors on both the analysis axis and the timeline.
+%    
+%    button_Callback: [line 1488]
+%    calls effector function processing.m to display the number of left and right steps on the
+%    Analysis Panel and -only if the representation active is the time representation-
+%    plot them as their respective symbols on the analysis axis.
+%    The symbols mark the END of each step. (i.e. that step was completed)
+%
+%    cad_Callback: [line 1103]
+%    calls effector function processing.m to display the cadence per zone on the
+%    Analysis Panel.
+%
+%%   Load Cells
+%    playload_Callback: [line 1722]
+%    calls effector function loadProcess.m to average load cell data per
+%    second. Represents seperately left and right foot a square
+%    corresponding to each load cell zone. 
+%
+%%   Video
+%
+%    videoImportbutton_Callback: [line 1393]
+%    Imports video and enables the video control buttons
+%
+%    playbutton_Callback: [line 1435]
+%    plays video and -if markers in place and synced- moves the timeline
+%    marker along the axis. Updates the scroll position (can be seen once
+%    stopped).
+%
+%    stopbutton_Callback: [line 1541]
+%    stops video through a boolean. Enables scroll.
+%
+%    forwardbutton_Callback: [line 1568]
+%    moves video frame one frame forwards and updates timeline marker if
+%    markers set and synced. Updates the scroll position.
+%
+%    backbutton_Callback: [line 1584]
+%    moves video frame one frame backwards and updates timeline marker if
+%    markers set and synced. Updates the scroll position.
+%
+%    scroll_Callback: [line 1606]
+%    allows to move through video using the scroll below 
+%
+%%   Markers
+%    vidMbutton_Callback: [line 1650]
+%    marks the current frame displayed with a yellow small circle (the
+%    marker) in the top left corner
+%
+%    timeMbutton_Callback: [line 1680]
+%    Allows user to interactively place the time marker on the timeline if
+%    the time representation is currently selected. It is the user's
+%    responsibility to place the marker correctly and to ensure that his
+%    selection is adapted to playing the timeline marker at the same time as the
+%    video.
+%
+%    syncbutton_Callback: [line 1710]
+%    Sets the boolean of sync to True: shows user intent to have timeline
+%    marker move along with the video being played.
+%
+%%   Save & Exit
+%    savebutton_Callback: [line 608]
+%    if selection has occurred then creates a new .mat file for the subwkv
+%    and a new text file with the same ID number.
+%    To save the analysis, it makes a text file with the data obtained from mode_button, button and cad_button. 
+%    It also calls all relevant Callbacks described above for the different represenations 
+%    and saves the GUI state as an image.
+%    After saving, Preview closes.
+%
+%    exitbutton_Callback: [line 1817]
+%    deletes Preview GUI
+%
+%%   Required External Functions and GUI
+%    Browser.m / Browser.fig
+%    dateSkippedChecked.m / extraction.m /getTimeDoubles.m /
+%    loadProcess.m / matTimeConversion.m / processing.m /  
+%    timestampConversion.m / wkv_get.m / wkv_split_cycles_from_txt.m 
+%    wkv_stack_cycles.m
 
-% Edit the above text to modify the response to help Preview
-
-% Last Modified by GUIDE v2.5 26-May-2018 11:45:37
-
+% Last Modified by GUIDE v2.5 02-Jun-2018 14:47:44
+%% Opening Code
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
@@ -97,6 +197,7 @@ set(handles.vidMbutton,'Enable','off');
 set(handles.timMbutton,'Enable','off');
 set(handles.syncbutton, 'Enable', 'off');
 set(handles.scroll, 'Enable', 'off');
+set(handles.stopbutton,'Enable', 'off');
 %for timeline
 set(handles.avbox, 'Enable', 'off');
 set(handles.allbox, 'Enable', 'off');
@@ -252,10 +353,8 @@ end
 % if no variable selected previously then plotting will occur when variable
 % selected later on via variableChoice_Callback
 if(handles.val~= '-')
-    %make the first time zero
-    initialTime=handles.wkv(end).values(handles.startIndex);
-    %make this initialTime a zero reference:
-    times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+    
+    times=handles.wkv(end).values(handles.startIndex:end);
     handles.timeline =plot(times, handles.wkv(varIndex).values(handles.startIndex:end));
     
     %set the checkbox of the representation mode to "time representation"
@@ -264,7 +363,7 @@ if(handles.val~= '-')
     
     % Plot and get the two clicks locations.
     axes(handles.Log_timeline);
-    xlabel('Time [us]');
+    xlabel('Time [s]');
     ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
     ytitle_split2=split(ytitle_split1{end}, '_');
     i=2; ytitle=ytitle_split2{1,1}
@@ -320,18 +419,15 @@ if(isequal(handles.loaded,1))
    
 
     wkv=handles.input.logs(handles.LogIndex).wkv;
-
+    
+    
     %% Cropping of the data of the wkv
 
     [t_crop, ~] = ginput(2);
-
+    
     % Get the corresponding begin/end indices.
     beginIndex = 1;
     endIndex = length(wkv(end).values);
-    
-    initialTime=wkv(end).values(1);
-    %reestablish seconds for 
-    t_crop= t_crop+initialTime;
     
     if t_crop(1) > t_crop(2)
         tmp = t_crop(1);
@@ -339,8 +435,8 @@ if(isequal(handles.loaded,1))
         t_crop(2) = tmp;
     end
 
-    for i=1:length(wkv(end).values)
-        if wkv(end).values(i) >= t_crop(1)
+    for i=1:length(wkv(end).values) 
+        if (wkv(end).values(i)) >= t_crop(1)
             beginIndex = i;
             break;
         end
@@ -386,7 +482,7 @@ if(isequal(handles.loaded,1))
         %further decomposition for a more in depth comparison of txt_date
         %and txt_first and txt_last
         str_elements = strsplit(txt_date,'_'); %seperate date from time
-        h=str_elements{1,2}; min=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
+        h=str_elements{1,2}; minute=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
         getDay=strsplit(str_elements{1,1},'-');
         d=getDay{1,3};
         
@@ -394,7 +490,7 @@ if(isequal(handles.loaded,1))
         %current line of the text file is after the desired first date
         %extracted from the subwkv or after the desired last date.
         
-        [passed_first] = dateSkippedCheck(secs, min, h, d,first_secs,first_min, first_hour, first_day);
+        [passed_first] = dateSkippedCheck(secs, minute, h, d,first_secs,first_min, first_hour, first_day);
         
         if(strcmp(txt_date,txt_first) || isequal(passed_first,1))
             handles.subtxt={};
@@ -409,10 +505,10 @@ if(isequal(handles.loaded,1))
                 %further decomposition for a more in depth comparison of txt_date
                 %and txt_first and txt_last
                 str_elements = strsplit(txt_date,'_'); %seperate date from time
-                h=str_elements{1,2}; min=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
+                h=str_elements{1,2}; minute=str_elements{1,3}; secs=str_elements{1,4}(1:end-1);
                 getDay=strsplit(str_elements{1,1},'-');
                 d=getDay{1,3};
-                [passed_last] = dateSkippedCheck(secs, min, h, d,last_secs,last_min, last_hour, last_day);
+                [passed_last] = dateSkippedCheck(secs, minute, h, d,last_secs,last_min, last_hour, last_day);
         
                 handles.subtxt{end+1,1}=entry;
                 index=index+1;
@@ -476,14 +572,17 @@ if(isequal(handles.loaded,1))
 
     if(handles.val~= '-')
         set(handles.timebox,'value',1)
-        %make the first time zero
-        initialTime=handles.wkv(end).values(handles.startIndex);
-        %make this initialTime a zero reference:
-        times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+        
+        times=handles.wkv(end).values(handles.startIndex:end);
         axes(handles.Log_timeline);
         handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        xmin=handles.wkv(end).values(handles.startIndex);
+        xmax=handles.wkv(end).values(end);
+        xlim([xmin, xmax]); 
+      
+        
         % labels 
-        xlabel('Time [us]');
+        xlabel('Timestamps');
         ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
         ytitle_split2=split(ytitle_split1{end}, '_');
         i=2; ytitle=ytitle_split2{1,1}
@@ -718,17 +817,15 @@ else
 end
 %% Plot on Timeline due to variable change
 if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
-    %make the first time zero
-    initialTime=handles.wkv(end).values(handles.startIndex);
-    %make this initialTime a zero reference:
-    times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+    
+    times=handles.wkv(end).values(handles.startIndex:end);
     axes(handles.Log_timeline);
     hold off;
     handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
         
     set(handles.timebox,'value',1);
     % Plot and get the two clicks locations.
-    xlabel('Time [us]');
+    xlabel('Time [s]');
     %%% 5 should be determined to be a choice representaition
     ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
     ytitle_split2=split(ytitle_split1{end}, '_');
@@ -873,11 +970,8 @@ if(isequal(handles.loaded,1))
            if(isequal(get(handles.timebox, 'value'),1))
                 
                 axes(handles.Log_timeline);
-                
-                %make the first time zero
-                initialTime=handles.wkv(end).values(handles.startIndex);
-                %make this initialTime a zero reference:
-                times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+                             
+                times=handles.wkv(end).values(handles.startIndex:end);
                 
                 handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
                 set(handles.timebox,'value',1);
@@ -890,14 +984,14 @@ if(isequal(handles.loaded,1))
             ind=1;
             while(ind<=length(handles.toPlotTimes) && ind<=length(handles.endMode_num))
                  if(isequal(get(handles.timebox, 'value'),1))
-                    xval=handles.toPlotTimes(ind)-initialTime;
+                    xval=handles.toPlotTimes(ind);
 
                     axes(handles.Log_timeline);
                     x=[xval,xval];
                     handles.timeline= plot(x,y, handles.colors{1,ind});
 
                     %second axis: on analysis plot 
-                    endplot=handles.endMode_num(ind)-initialTime;
+                    endplot=handles.endMode_num(ind);
                     x_analysis=[xval, endplot];
                     axes(handles.analysisAxis);
                     xlim manual;
@@ -964,7 +1058,7 @@ if(isequal(handles.loaded,1))
         end
 
         %% After extraction and other processes, represent analysis data
-        initialTime=handles.wkv(end).values(handles.startIndex);
+        
         if(~isempty(handles.LeftS_num) && ~isempty(handles.RightS_num))
             k=1; j=1;
             if(isequal(get(handles.timebox, 'value'),1))
@@ -974,7 +1068,7 @@ if(isequal(handles.loaded,1))
                    xlim manual;
                    ylim([0,1]);
                    hold on
-                   plot([handles.RightS_num(k)-initialTime,handles.RightS_num(k)-initialTime],[0.5,0.5], 'ko');
+                   plot([handles.RightS_num(k),handles.RightS_num(k)],[0.5,0.5], 'ko');
                    k=k+1;
                 end
 
@@ -983,7 +1077,7 @@ if(isequal(handles.loaded,1))
                    xlim manual;
                    ylim([0,1]);
                    hold on
-                   plot([handles.LeftS_num(j)-initialTime,handles.LeftS_num(j)-initialTime],[0.5,0.5], 'k*');
+                   plot([handles.LeftS_num(j),handles.LeftS_num(j)],[0.5,0.5], 'k*');
                    j=j+1;
                  end
                 hold off;
@@ -1068,13 +1162,12 @@ if(isequal(handles.loaded,1))
         set(handles.allbox, 'value', 0);
         set(handles.avbox, 'value',0);
         set(handles.select_button, 'Enable', 'on');
+        set(handles.timMbutton,'Enable','on');
+        set(handles.syncbutton, 'Enable', 'on')
 
         axes(handles.Log_timeline);
         hold off;
-        %make the first time zero
-        initialTime=handles.wkv(end).values(handles.startIndex);
-        %make this initialTime a zero reference:
-        times=handles.wkv(end).values(handles.startIndex:end)-initialTime;
+        times=handles.wkv(end).values(handles.startIndex:end);
         plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
     end
 end
@@ -1112,6 +1205,8 @@ if(isequal(handles.loaded,1))
             set(handles.timebox, 'Enable','on');
             set(handles.allbox, 'Enable','off');
             set(handles.select_button, 'Enable', 'off');
+            set(handles.timMbutton,'Enable','off');
+            set(handles.syncbutton, 'Enable', 'off');
             %% Adapt the step data so as to always have full 2 step cycle based on the left leg foot off
             if(handles.ind_RightS(1)>handles.ind_LeftS(1))
                 %take away the end of this first left step time so that the
@@ -1217,6 +1312,8 @@ if(isequal(handles.loaded,1))
             set(handles.timebox, 'Enable','on');
             set(handles.allbox, 'Enable','off');
             set(handles.select_button, 'Enable', 'off');
+            set(handles.timMbutton,'Enable','off');
+            set(handles.syncbutton, 'Enable', 'off');
             %% Adapt the step data so as to always have full 2 step cycle based on the left leg foot off
             if(handles.ind_RightS(1)>handles.ind_LeftS(1))
                 %take away the end of this first left step time so that the
@@ -1328,6 +1425,7 @@ set(handles.forwardbutton,'Enable','on');
 set(handles.backbutton,'Enable','on');
 set(handles.vidMbutton,'Enable','on');
 set(handles.scroll, 'Enable', 'on');
+set(handles.stopbutton,'Enable', 'on');
 
 
 guidata(hObject, handles);
@@ -1347,7 +1445,7 @@ set(handles.videoImportbutton,'Enable','off');
 
 if(strcmp(get(handles.playbutton,'String'),'Play'))
     %% Play has been clicked
-    set(handles.playbutton,'String','Pause');
+    %set(handles.playbutton,'String','Pause');
     
     set(handles.forwardbutton,'Enable','off');
     set(handles.backbutton,'Enable','off');
@@ -1367,34 +1465,25 @@ if(strcmp(get(handles.playbutton,'String'),'Play'))
     
     handles.user_quit=0;
     guidata(hObject, handles);
-
-else
-    %% Pause has been clicked
-    set(handles.playbutton,'String','Play');
-    
-    set(handles.forwardbutton,'Enable','on');
-    set(handles.backbutton,'Enable','on');
-    set(handles.vidMbutton,'Enable','on');
-    set(handles.timMbutton,'Enable','on');
-    set(handles.scroll, 'Enable', 'on');
-    set(handles.exitbutton,'Enable','on');
-    
-    handles.user_quit=1;
-    guidata(hObject, handles);
         
 end
 
 %timeline 
-ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-y=[ymin,ymax]; %height of the curves
+if(isequal(handles.loaded,1))
+    if(~isequal(handles.varIndex, '-'))
+    ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+    ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+    y=[ymin,ymax]; %height of the curves
+    end
+end
 
 for i=handles.f:handles.totalframes
     axes(handles.videoaxes);
     
     handles = guidata(hObject);
+    disp(handles.user_quit);
     
-    if(~handles.user_quit)
+    if(strcmp(get(handles.playbutton,'String'),'Pause') || ~handles.user_quit)
         
         %update frame count and update scroll position
         handles.f=i;
@@ -1408,14 +1497,14 @@ for i=handles.f:handles.totalframes
         if(isequal(i,handles.markedFnum))
             imshow(handles.markedFrame);
             drawnow;
-            pause(0.02);
+            pause(0.05);
         else
             %display frames one after the other
             handles.frame = read(handles.videoObject,i);
             guidata(hObject, handles);
             imshow(handles.frame);
             drawnow;
-            pause(0.095); 
+            pause(0.05); 
 
             %timeline. 
             %sync must be activated and frames played must be after the marked frame
@@ -1447,6 +1536,25 @@ end
 
 guidata(hObject, handles);
 
+
+% --- Executes on button press in stopbutton.
+function stopbutton_Callback(hObject, eventdata, handles)
+% hObject    handle to stopbutton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%% Stop has been clicked
+
+set(handles.forwardbutton,'Enable','on');
+set(handles.backbutton,'Enable','on');
+set(handles.vidMbutton,'Enable','on');
+set(handles.timMbutton,'Enable','on');
+set(handles.scroll, 'Enable', 'on');
+set(handles.exitbutton,'Enable','on');
+set(handles.videoImportbutton,'Enable','on');
+
+handles.user_quit=1;
+guidata(hObject, handles);
+
 % --- Executes on button press in forwardbutton.
 function forwardbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to forwardbutton (see GCBO)
@@ -1456,6 +1564,7 @@ function forwardbutton_Callback(hObject, eventdata, handles)
 %% Forward Button
 axes(handles.videoaxes);
 if(isequal(handles.f+1,handles.markedFnum))
+    handles.f=(handles.f+1);
     imshow(handles.markedFrame);
     drawnow;
     pause(0.02);
@@ -1479,6 +1588,7 @@ function backbutton_Callback(hObject, eventdata, handles)
 %% Backward Button
 axes(handles.videoaxes);
 if(isequal(handles.f-1,handles.markedFnum))
+    handles.f=(handles.f-1);
     imshow(handles.markedFrame);
     drawnow;
     pause(0.02);
@@ -1657,7 +1767,7 @@ if(isequal(handles.loaded,1))
 
                 aR=handles.loadpersec(i,5); bR=handles.loadpersec(i,6); cR=handles.loadpersec(i,7); dR=handles.loadpersec(i,8);
                 Row2R=[cR dR]; Row1R=[aR bR];
-                cdataR=[Row1R;Row2R]
+                cdataR=[Row1R;Row2R];
                 
                 %% Draw left Load cells
                 handles = guidata(hObject);

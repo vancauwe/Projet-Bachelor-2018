@@ -1,5 +1,8 @@
 function[loadpersec,stamps]=loadProcess(wkv)
 
+%LOADPROCESS 
+%   Averages load cell data over each second and memorizes the timestamps for each second.
+
 tot_aL=0; tot_bL=0; tot_cL=0; tot_dL=0;
 tot_aR=0; tot_bR=0; tot_cR=0; tot_dR=0;
 tot_elements=0;

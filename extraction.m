@@ -1,5 +1,14 @@
 function [dates,modes,colors,endMode,left,right,startCadTime,endCadTime, LeftS, RightS] = extraction(txt)
 
+%EXTRACTION 
+%   The function iterates through each entry (one entry= one line; 
+%   each line is seperated by an indent) of the text file associated to the
+%   wkv log data loaded into Preview GUI.
+
+%   Through the case switch, it outputs for further analysis:
+%   - modes [strings], colors, dates and endMode [text file timestamps] for the Mode Button
+%   - left and right [doubles], LeftS and RightS [text file timestamps] for the Step Button
+%   - startCadTime and endCadTime [text file timestamps] for the Cadence Button
 
 %% Initialisation
 index=1; j=1; o=1; l=1; p=1;
@@ -8,6 +17,7 @@ left=0; right=0;
 %logicals
 entered=0;
 walking=0;
+newstartpossible=1; %initially possible to start cadence
 
 
 while(length(txt)>=index)
@@ -68,7 +78,9 @@ while(length(txt)>=index)
             case 'Starting'
 %% For beginning of cadence measurement by "Starting first step"
                 
-                if(isequal(entry_decompo{1,3},'first'))
+                if(isequal(entry_decompo{1,3},'first') && isequal(newstartpossible,1))
+                    %not possible to have new start until end of cadence sets the boolean back to 1
+                    newstartpossible=0; 
                     startCadTime{1,l}=txt_date;
                     l=l+1;
                    
@@ -80,6 +92,7 @@ while(length(txt)>=index)
 
             if(isequal(entry_decompo{1,3},'exited...') && isequal(entered,1))
                 endMode{1,p}=txt_date;
+                newstartpossible=1;
                 p=p+1;
                 if(isequal(walking,1))
                     endCadTime{1,o}= endTime;

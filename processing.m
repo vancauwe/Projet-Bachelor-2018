@@ -1,6 +1,24 @@
 function [starts_num, ends_num, RightS_num, LeftS_num, endMode_num,...
     toPlotTimes, ind_PlotTimes, ind_RightS, ind_LeftS,...
-    left,right, colors, startCadTime, endCadTime, modes]=processing(textfile, wkv)
+    left,right, colors, startCadTime, endCadTime, modes] = processing(textfile, wkv)
+
+%PROCESSING 
+%   The function calls:
+%   1. extraction (get text file entries and info)
+%   2. matTimeConversion (convert text file entries into wkv timestamps)
+%   3. getTimeDoubles (from wkv timestamps get the time doubles
+%   corresponding)
+
+%   Through the process, it outputs for further analysis:
+%   - for Mode Button: modes [strings], colors, toPlotTimes and endMode_num [wkv timestamps]
+%   - for Step Button: left and right [doubles], LeftS_num and RightS_num [wkv timestamps] 
+%   - for Cadence Button: starts_num and ends_num [wkv timestamps] 
+%   - for All Button & Av Button (Cycles) : ind_PlotTimes, ind_RightS, ind_LeftS (doubles) 
+%   (as it is easier to compare indices than timestamps)
+
+%   Hence the function processing.m is called in the following Callbacks: avbutton,
+%   allbutton, mode_button, button, cad_button
+
 %% Extraction must be done once to get all data. First run takes time
 %operation of the function getTimeDoubles taking time is to process 
 %the timestamps dates (wkv(1)) vs. time doubles (wkv(end))

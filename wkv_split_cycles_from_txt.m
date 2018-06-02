@@ -1,10 +1,9 @@
 function cycles = wkv_split_cycles_from_txt(wkv, indices, N)
-%WKV_SPLIT_CYCLES_ Splits into sub-wkvs with a single cycle.
-%   Splits the given wkv into individual cycles. The method is to strongly
-%   filter the values corresponding to the splittingVar index, such that
-%   they become a centered sine-like curve. The cutting point are where
-%   this curve is crossing zero from a negative to a positive value.
-%   The found cutting points can be shift by the phaseOffset [%].
+%WKV_SPLIT_CYCLES_FROM_TXT Splits into sub-wkvs with a single cycle.
+%   Splits the given wkv into individual cycles. The method uses the data
+%   extracted from the associated text file to the wkv. Using this data, we
+%   put together the data coming from single steps so as to obtain a cycle
+%   of 2 steps always based on the left leg toe off.
 
 %% Detect the cycles.
 
