@@ -259,7 +259,7 @@ if (length(handles.filelist) >= 1)
     
     f = msgbox({'The minimum number of files for an album is 2.'; ...
         'Note: To select multiple files use "command" or "control" as appropriate to your OS.'}, ...
-        'Making an album Important Information' ); if (length(get(handles.filelist,'value')) > 1) set(handles.albumbutton, 'Enable', 'on'); end
+        'Making an album Important Information' );
 
 else
    errordlg(['Files must be opened in browser before making album.'],'Make Album Error!');
