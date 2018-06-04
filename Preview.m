@@ -76,11 +76,11 @@ function varargout = Preview(varargin)
 %    stopbutton_Callback: [line 1541]
 %    stops video through a boolean. Enables scroll.
 %
-%    forwardbutton_Callback: [line 1568]
+%    forwardbutton_Callback: [line 1558]
 %    moves video frame one frame forwards and updates timeline marker if
 %    markers set and synced. Updates the scroll position.
 %
-%    backbutton_Callback: [line 1584]
+%    backbutton_Callback: [line 1583]
 %    moves video frame one frame backwards and updates timeline marker if
 %    markers set and synced. Updates the scroll position.
 %
@@ -356,7 +356,7 @@ if(handles.val~= '-')
     
     times=handles.wkv(end).values(handles.startIndex:end);
     handles.timeline =plot(times, handles.wkv(varIndex).values(handles.startIndex:end));
-    
+    xmin=handles.wkv(end).values(handles.startIndex); xmax=handles.wkv(end).values(end); xlim([xmin, xmax]);
     %set the checkbox of the representation mode to "time representation"
     set(handles.timebox, 'Enable', 'on');
     set(handles.timebox,'value',1);
@@ -825,7 +825,7 @@ if(~isequal(handles.val, '-') && isequal(handles.loaded,1))
         
     set(handles.timebox,'value',1);
     % Plot and get the two clicks locations.
-    xlabel('Time [s]');
+    xlabel('Time [s]'); xmin=handles.wkv(end).values(handles.startIndex); xmax=handles.wkv(end).values(end); xlim([xmin, xmax]);
     %%% 5 should be determined to be a choice representaition
     ytitle_split1=split(string(handles.wkv(handles.varIndex).name), '/');
     ytitle_split2=split(ytitle_split1{end}, '_');
@@ -976,9 +976,9 @@ if(isequal(handles.loaded,1))
                 handles.timeline =plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end), 'black');
                 set(handles.timebox,'value',1);
                 hold on
-                ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-                ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
-                y=[ymin,ymax]; %height of the curves
+                ymin=min(handles.wkv(handles.varIndex).values(handles.startIndex:end));ymax=max(handles.wkv(handles.varIndex).values(handles.startIndex:end));
+                xmin=handles.wkv(end).values(handles.startIndex); xmax=handles.wkv(end).values(end);
+                xlim([xmin, xmax]); y=[ymin,ymax]; %height of the curves
            end 
             
             ind=1;
@@ -1168,7 +1168,7 @@ if(isequal(handles.loaded,1))
         axes(handles.Log_timeline);
         hold off;
         times=handles.wkv(end).values(handles.startIndex:end);
-        plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end));
+        plot(times, handles.wkv(handles.varIndex).values(handles.startIndex:end)); xmin=handles.wkv(end).values(handles.startIndex); xmax=handles.wkv(end).values(end); xlim([xmin, xmax]);
     end
 end
 
@@ -1217,7 +1217,7 @@ if(isequal(handles.loaded,1))
             
             %Check that right step time +1 superior than left step time 
             %else take away last left step time because would leave half a cycle
-            if(length(handles.ind_RightS)<length(handles.ind_LeftS))
+            if(length(handles.ind_RightS)<=length(handles.ind_LeftS))
                 handles.ind_LeftS=handles.ind_LeftS(1:end-1);
             end
             
@@ -1324,7 +1324,7 @@ if(isequal(handles.loaded,1))
             
             %Check that right step time +1 superior than left step time 
             %else take away last left step time because would leave half a cycle
-            if(length(handles.ind_RightS)<length(handles.ind_LeftS))
+            if(length(handles.ind_RightS)<=length(handles.ind_LeftS))
                 handles.ind_LeftS=handles.ind_LeftS(1:end-1);
             end
             
@@ -1544,15 +1544,14 @@ function stopbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %% Stop has been clicked
 
-set(handles.forwardbutton,'Enable','on');
-set(handles.backbutton,'Enable','on');
-set(handles.vidMbutton,'Enable','on');
-set(handles.timMbutton,'Enable','on');
-set(handles.scroll, 'Enable', 'on');
-set(handles.exitbutton,'Enable','on');
-set(handles.videoImportbutton,'Enable','on');
+set(handles.forwardbutton,'Enable','on'); set(handles.backbutton,'Enable','on'); set(handles.vidMbutton,'Enable','on');
+set(handles.timMbutton,'Enable','on');set(handles.scroll, 'Enable', 'on');
+set(handles.exitbutton,'Enable','on'); set(handles.videoImportbutton,'Enable','on');
+set(handles.avbox, 'Enable', 'on'); set(handles.allbox, 'Enable', 'on');
+set(handles.timebox, 'Enable', 'on'); set(handles.cad_button, 'Enable', 'on');
+set(handles.button, 'Enable', 'on'); set(handles.mode_button, 'Enable', 'on');
+set(handles.save_button, 'Enable', 'on');set(handles.select_button, 'Enable', 'on'); set(handles.playload, 'Enable', 'on');
 
-handles.user_quit=1;
 guidata(hObject, handles);
 
 % --- Executes on button press in forwardbutton.
