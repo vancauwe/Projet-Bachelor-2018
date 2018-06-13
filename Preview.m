@@ -1544,7 +1544,7 @@ function stopbutton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %% Stop has been clicked
 
-set(handles.forwardbutton,'Enable','on'); set(handles.backbutton,'Enable','on'); set(handles.vidMbutton,'Enable','on');
+handles.user_quit=1; set(handles.forwardbutton,'Enable','on'); set(handles.backbutton,'Enable','on'); set(handles.vidMbutton,'Enable','on');
 set(handles.timMbutton,'Enable','on');set(handles.scroll, 'Enable', 'on');
 set(handles.exitbutton,'Enable','on'); set(handles.videoImportbutton,'Enable','on');
 set(handles.avbox, 'Enable', 'on'); set(handles.allbox, 'Enable', 'on');
